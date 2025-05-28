@@ -1,3 +1,6 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
 export const formatDate = (date: string | Date): string => {
   const d = new Date(date);
   return d.toLocaleDateString('en-US', {
@@ -28,4 +31,8 @@ export const groupBy = <T>(array: T[], key: keyof T): { [key: string]: T[] } => 
       [groupKey]: [...(result[groupKey] || []), item],
     };
   }, {} as { [key: string]: T[] });
-}; 
+};
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+} 
