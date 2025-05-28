@@ -9,7 +9,7 @@ export interface ScrollAreaProps extends React.HTMLAttributes<HTMLDivElement> {
 export const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
   ({ className, children, orientation = "vertical", scrollHideDelay = 600, ...props }, ref) => {
     const [isScrolling, setIsScrolling] = React.useState(false);
-    const scrollTimeout = React.useRef<NodeJS.Timeout>();
+    const scrollTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     const handleScroll = React.useCallback(() => {
       setIsScrolling(true);
