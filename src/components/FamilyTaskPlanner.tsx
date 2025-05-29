@@ -188,7 +188,7 @@ export default function FamilyTaskPlanner() {
     setDraggedTask(null)
   }
 
-  const handleTaskSubmit = async (data: TaskFormData, andContinue?: boolean) => {
+  const handleTaskSubmit = async (data: TaskFormData) => {
     try {
       setError(null)
 
@@ -249,7 +249,7 @@ export default function FamilyTaskPlanner() {
     }
   }
 
-  const handleObjectiveSubmit = async (data: ObjectiveFormData, andContinue?: boolean) => {
+  const handleObjectiveSubmit = async (data: ObjectiveFormData) => {
     try {
       setError(null)
 
@@ -286,7 +286,7 @@ export default function FamilyTaskPlanner() {
     }
   }
 
-  const handleMaintenanceSubmit = async (data: MaintenanceFormData, andContinue?: boolean) => {
+  const handleMaintenanceSubmit = async (data: MaintenanceFormData) => {
     try {
       setError(null)
 
