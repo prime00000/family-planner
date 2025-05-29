@@ -1,20 +1,26 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus } from "lucide-react"
+import { TaskForm, type TaskFormData } from "@/components/forms/TaskForm"
+import { supabase } from "@/lib/supabase"
 
 interface Task {
   id: string
   title: string
   assignee: string
   completed: boolean
+}
+
+interface TagData {
+  id: string
+  name: string
 }
 
 const mockTasks: Record<string, Task[]> = {
@@ -63,6 +69,10 @@ const mockTasks: Record<string, Task[]> = {
   ],
 }
 
+// Constants for now - would come from auth/context later
+const TEAM_ID = 'ada25a92-25fa-4ca2-8d35-eb9b71f97e4b'
+const USER_ID = 'a0000000-0000-0000-0000-000000000001'
+
 export default function FamilyTaskPlanner() {
   const [selectedUser, setSelectedUser] = useState("All Tasks")
   const [activeTab, setActiveTab] = useState("home")
@@ -80,8 +90,11 @@ export default function FamilyTaskPlanner() {
     completed: false,
   })
   const [draggedTask, setDraggedTask] = useState<{ task: Task; fromSection: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [tagMap, setTagMap] = useState<Record<string, string>>({}) // Maps tag names to IDs
+  const [isLoadingTags, setIsLoadingTags] = useState(true)
 
-  const users = ["All Tasks", "Kurt", "Wife", "Child1", "Child2"]
+  const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
   const sections = [
     { key: "monday", name: "Monday" },
     { key: "tuesday", name: "Tuesday" },
@@ -94,6 +107,38 @@ export default function FamilyTaskPlanner() {
     { key: "deck", name: "Deck" },
     { key: "completed", name: "Completed Tasks" },
   ]
+
+  // Fetch tags when component mounts
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        setIsLoadingTags(true)
+        const { data: tags, error: tagError } = await supabase
+          .from('tags')
+          .select('id, name')
+          .eq('team_id', TEAM_ID)
+
+        if (tagError) throw tagError
+
+        // Create a map of tag names to IDs
+        const newTagMap = (tags as TagData[]).reduce((acc, tag) => {
+          // Convert database tag names to match form tag IDs
+          const formTagId = tag.name.toLowerCase().replace(/\s+/g, '')
+          acc[formTagId] = tag.id
+          return acc
+        }, {} as Record<string, string>)
+
+        setTagMap(newTagMap)
+      } catch (err) {
+        console.error('Error fetching tags:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load tags')
+      } finally {
+        setIsLoadingTags(false)
+      }
+    }
+
+    fetchTags()
+  }, [])
 
   const filterTasks = (sectionTasks: Task[]) => {
     if (selectedUser === "All Tasks") return sectionTasks
@@ -139,6 +184,67 @@ export default function FamilyTaskPlanner() {
     }
 
     setDraggedTask(null)
+  }
+
+  const handleTaskSubmit = async (data: TaskFormData, andContinue?: boolean) => {
+    try {
+      setError(null)
+
+      // Map form tag IDs to database tag IDs
+      const databaseTagIds = data.tags
+        .map(tagName => tagMap[tagName])
+        .filter(Boolean) // Remove any undefined tags
+
+      // Prepare task data
+      const taskData = {
+        team_id: TEAM_ID,
+        submitted_by: USER_ID,
+        description: data.description,
+        importance: data.importance,
+        urgency: data.urgency,
+        objective_id: (data.objectiveId === 'none' || data.objectiveId?.startsWith('obj')) ? null : data.objectiveId,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Insert task
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .insert(taskData)
+        .select()
+        .single()
+
+      if (taskError) throw taskError
+
+      // If we have tags, insert them
+      if (databaseTagIds.length > 0) {
+        const tagInserts = databaseTagIds.map(tagId => ({
+          task_id: task.id,
+          tag_id: tagId,
+        }))
+
+        const { error: tagError } = await supabase
+          .from('task_tags')
+          .insert(tagInserts)
+
+        if (tagError) {
+          console.error('Error saving tags:', tagError)
+          // Don't throw here - task was saved successfully
+        }
+      }
+
+      console.log('Task saved successfully:', task)
+      console.log('Should refresh task list here')
+
+      // Reset error state on success
+      setError(null)
+
+    } catch (err) {
+      console.error('Error saving task:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save task')
+      throw err // Let the form handle the error display
+    }
   }
 
   const TaskItem = ({ task, sectionKey }: { task: Task; sectionKey: string }) => (
@@ -208,6 +314,11 @@ export default function FamilyTaskPlanner() {
       <main className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 pb-24">
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
             {sections.map((section) => {
               const filteredTasks = filterTasks(tasks[section.key])
               if (filteredTasks.length === 0 && selectedUser !== "All Tasks" && section.key !== "completed") return null
@@ -270,6 +381,15 @@ export default function FamilyTaskPlanner() {
           ))}
         </div>
       </nav>
+
+      {/* Task Form */}
+      {activeTab === "tasks" && !isLoadingTags && (
+        <TaskForm
+          users={users.filter(u => u !== "All Tasks")}
+          onClose={() => setActiveTab("home")}
+          onSubmit={handleTaskSubmit}
+        />
+      )}
     </div>
   )
 }
