@@ -9,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus } from "lucide-react"
 import { TaskForm, type TaskFormData } from "@/components/forms/TaskForm"
+import { ObjectiveForm, type ObjectiveFormData } from "@/components/forms/ObjectiveForm"
+import { MaintenanceForm, type MaintenanceFormData } from "@/components/forms/MaintenanceForm"
 import { supabase } from "@/lib/supabase"
 
 interface Task {
@@ -186,7 +188,7 @@ export default function FamilyTaskPlanner() {
     setDraggedTask(null)
   }
 
-  const handleTaskSubmit = async (data: TaskFormData) => {
+  const handleTaskSubmit = async (data: TaskFormData, andContinue?: boolean) => {
     try {
       setError(null)
 
@@ -243,6 +245,82 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error saving task:', err)
       setError(err instanceof Error ? err.message : 'Failed to save task')
+      throw err // Let the form handle the error display
+    }
+  }
+
+  const handleObjectiveSubmit = async (data: ObjectiveFormData, andContinue?: boolean) => {
+    try {
+      setError(null)
+
+      // Prepare objective data
+      const objectiveData = {
+        team_id: TEAM_ID,
+        submitted_by: USER_ID,
+        description: data.description,
+        importance: data.importance,
+        urgency: null, // Objectives don't have urgency
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Insert objective
+      const { data: objective, error: objectiveError } = await supabase
+        .from('objectives')
+        .insert(objectiveData)
+        .select()
+        .single()
+
+      if (objectiveError) throw objectiveError
+
+      console.log('Objective saved successfully:', objective)
+
+      // Reset error state on success
+      setError(null)
+
+    } catch (err) {
+      console.error('Error saving objective:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save objective')
+      throw err // Let the form handle the error display
+    }
+  }
+
+  const handleMaintenanceSubmit = async (data: MaintenanceFormData, andContinue?: boolean) => {
+    try {
+      setError(null)
+
+      // Prepare maintenance data
+      const maintenanceData = {
+        team_id: TEAM_ID,
+        submitted_by: USER_ID,
+        description: data.description,
+        importance: data.importance,
+        frequency: data.frequency.toLowerCase(), // Store frequency in lowercase
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Insert maintenance item
+      const { data: maintenanceItem, error: maintenanceError } = await supabase
+        .from('maintenance_items')
+        .insert(maintenanceData)
+        .select()
+        .single()
+
+      if (maintenanceError) throw maintenanceError
+
+      console.log('Maintenance item saved successfully:', maintenanceItem)
+
+      // Note: Tags are skipped for now until we add maintenance-specific tags to the database
+      // We'll need to add a separate migration to create these tags
+
+      // Reset error state on success
+      setError(null)
+
+    } catch (err) {
+      console.error('Error saving maintenance item:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save maintenance item')
       throw err // Let the form handle the error display
     }
   }
@@ -388,6 +466,22 @@ export default function FamilyTaskPlanner() {
           users={users.filter(u => u !== "All Tasks")}
           onClose={() => setActiveTab("home")}
           onSubmit={handleTaskSubmit}
+        />
+      )}
+
+      {/* Objective Form */}
+      {activeTab === "objectives" && (
+        <ObjectiveForm
+          onClose={() => setActiveTab("home")}
+          onSubmit={handleObjectiveSubmit}
+        />
+      )}
+
+      {/* Maintenance Form */}
+      {activeTab === "maintenance" && (
+        <MaintenanceForm
+          onClose={() => setActiveTab("home")}
+          onSubmit={handleMaintenanceSubmit}
         />
       )}
     </div>
