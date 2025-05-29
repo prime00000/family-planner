@@ -90,10 +90,11 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
     }
   }
 
+  // Force rebuild
   const renderRatingGroup = (
     name: 'importance' | 'urgency',
-    value?: number,
-    onChange: (value: number) => void
+    onChange: (value: number) => void,
+    value?: number
   ) => (
     <div className="flex items-center justify-between gap-1 px-2">
       {[1, 2, 3, 4, 5].map((rating) => (
@@ -187,8 +188,8 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
               </label>
               {renderRatingGroup(
                 'importance',
-                formData.importance,
-                (value) => setFormData(prev => ({ ...prev, importance: value }))
+                (value) => setFormData(prev => ({ ...prev, importance: value })),
+                formData.importance
               )}
             </div>
 
@@ -198,8 +199,8 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
               </label>
               {renderRatingGroup(
                 'urgency',
-                formData.urgency,
-                (value) => setFormData(prev => ({ ...prev, urgency: value }))
+                (value) => setFormData(prev => ({ ...prev, urgency: value })),
+                formData.urgency
               )}
             </div>
 
