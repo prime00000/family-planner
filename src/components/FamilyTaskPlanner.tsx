@@ -118,7 +118,7 @@ export default function FamilyTaskPlanner() {
           .from('tasks')
           .select(`
             *,
-            users (
+            users!assignee_id (
               full_name
             )
           `)
