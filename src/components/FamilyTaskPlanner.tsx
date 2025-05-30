@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -25,7 +25,14 @@ interface Task {
   updated_at: string
 }
 
-interface TaskWithUser extends Task {
+interface TaskWithUser {
+  id: string
+  description: string  // This matches the database field
+  status: string
+  importance: number | null
+  urgency: number | null
+  created_at: string | null
+  updated_at: string | null
   users: {
     full_name: string
   }
@@ -87,7 +94,7 @@ export default function FamilyTaskPlanner() {
     { key: "completed", name: "Completed Tasks" },
   ]
 
-  const dayMapping = { 
+  const dayMapping = useMemo(() => ({ 
     monday: 1, 
     tuesday: 2, 
     wednesday: 3, 
@@ -96,7 +103,7 @@ export default function FamilyTaskPlanner() {
     saturday: 6, 
     sunday: 0, 
     anytime: 7 
-  }
+  }), [])
 
   // Fetch tasks when component mounts
   useEffect(() => {
@@ -126,8 +133,8 @@ export default function FamilyTaskPlanner() {
             assignee: task.users?.full_name || 'Unassigned',
             completed: task.status === 'completed',
             status: task.status || 'pending',
-            importance: task.importance,
-            urgency: task.urgency,
+            importance: task.importance ?? undefined,
+            urgency: task.urgency ?? undefined,
             created_at: task.created_at || new Date().toISOString(),
             updated_at: task.updated_at || new Date().toISOString(),
           }
@@ -457,13 +464,13 @@ export default function FamilyTaskPlanner() {
       const transformedTask: Task = {
         id: task.id,
         title: task.description,
-        assignee: 'You', // Temporary until we fetch the user name
+        assignee: 'You',
         completed: false,
         status: 'pending',
-        importance: task.importance,
-        urgency: task.urgency,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
+        importance: task.importance ?? undefined,
+        urgency: task.urgency ?? undefined,
+        created_at: task.created_at || new Date().toISOString(),
+        updated_at: task.updated_at || new Date().toISOString(),
       }
 
       setTasks(prev => ({
