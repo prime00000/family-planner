@@ -256,8 +256,7 @@ export default function FamilyTaskPlanner() {
 
       const newStatus = task.completed ? 'pending' : 'completed'
       const originalSection = sectionKey
-      const targetSection = newStatus === 'completed' ? 'completed' : 
-        task.day_of_week ? Object.entries(dayMapping).find(([, value]) => value === task.day_of_week)?.[0] || 'anytime' : 'anytime'
+      const targetSection = newStatus === 'completed' ? 'completed' : originalSection
 
       // Optimistically update UI
       setTasks(prev => {
