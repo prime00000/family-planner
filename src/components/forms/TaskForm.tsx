@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useAuth } from '@/lib/auth/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 interface TaskFormProps {
-  users: string[]
   onClose: () => void
   onSubmit: (data: TaskFormData, andContinue?: boolean) => void
 }
@@ -17,6 +18,12 @@ export interface TaskFormData {
   urgency?: number
   tags: string[]
   objectiveId?: string
+  assignee_id?: string
+}
+
+interface FamilyMember {
+  id: string
+  full_name: string
 }
 
 const TAGS = [
@@ -37,12 +44,37 @@ const SAMPLE_OBJECTIVES = [
 ]
 
 export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
+  const { user } = useAuth()
   const [formData, setFormData] = useState<TaskFormData>({
     description: '',
     tags: [],
   })
   const [showSuccess, setShowSuccess] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
+
+  useEffect(() => {
+    // Fetch family members
+    async function fetchFamilyMembers() {
+      try {
+        const { data: members, error } = await supabase
+          .from('users')
+          .select('id, full_name')
+          .order('full_name')
+
+        if (error) throw error
+
+        setFamilyMembers(members || [])
+      } catch (err) {
+        console.error('Error fetching family members:', err)
+      } finally {
+        setIsLoadingMembers(false)
+      }
+    }
+
+    fetchFamilyMembers()
+  }, [])
 
   useEffect(() => {
     // Trigger animation after mount
@@ -73,7 +105,7 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
     
     if (!andContinue) {
       setTimeout(() => {
-        handleClose()
+        onClose()  // Call onClose directly instead of handleClose
       }, 1500)
     } else {
       // For Submit+, show overlay success message and reset form
@@ -85,6 +117,7 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
           urgency: undefined,
           tags: [],
           objectiveId: undefined,
+          assignee_id: undefined,
         })
       }, 1500)
     }
@@ -180,6 +213,31 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
                   Quick Submit +
                 </Button>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assign to
+              </label>
+              <Select
+                value={formData.assignee_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, assignee_id: value }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select assignee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {user && (
+                    <SelectItem value={user.id}>Assign to Myself</SelectItem>
+                  )}
+                  {familyMembers.map(member => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

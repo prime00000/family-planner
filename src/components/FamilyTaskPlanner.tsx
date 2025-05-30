@@ -293,6 +293,7 @@ export default function FamilyTaskPlanner() {
         description: data.description,
         importance: data.importance,
         urgency: data.urgency,
+        assignee_id: data.assignee_id || null,  // Include assignee_id
         objective_id: (data.objectiveId === 'none' || data.objectiveId?.startsWith('obj')) ? null : data.objectiveId,
         status: 'pending',
         created_at: new Date().toISOString(),
@@ -572,7 +573,10 @@ export default function FamilyTaskPlanner() {
             ) : (
               sections.map((section) => {
                 const filteredTasks = filterTasks(tasks[section.key])
-                if (filteredTasks.length === 0 && selectedUser !== "All Tasks" && section.key !== "completed") return null
+                // Only hide completed section when empty
+                if (section.key === "completed" && filteredTasks.length === 0 && selectedUser !== "All Tasks") {
+                  return null
+                }
 
                 return (
                   <Collapsible
@@ -637,7 +641,6 @@ export default function FamilyTaskPlanner() {
       {/* Task Form */}
       {activeTab === "tasks" && !isLoadingTags && (
         <TaskForm
-          users={users.filter(u => u !== "All Tasks")}
           onClose={() => setActiveTab("home")}
           onSubmit={handleTaskSubmit}
         />
@@ -646,7 +649,6 @@ export default function FamilyTaskPlanner() {
       {/* Manual Add Task Form */}
       {manualAddDay && (
         <TaskForm
-          users={users.filter(u => u !== "All Tasks")}
           onClose={() => setManualAddDay(null)}
           onSubmit={(data) => handleManualTaskSubmit(data, manualAddDay)}
         />
