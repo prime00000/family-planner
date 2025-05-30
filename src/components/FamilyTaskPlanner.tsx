@@ -443,16 +443,18 @@ export default function FamilyTaskPlanner() {
       }
 
       // Insert task
-      const { error: taskError } = await supabase
+      const { data: insertedTask, error: taskError } = await supabase
         .from('tasks')
         .insert(taskData)
+        .select()
+        .single()
 
       if (taskError) throw taskError
 
       // If we have tags, insert them
       if (databaseTagIds.length > 0) {
         const tagInserts = databaseTagIds.map(tagId => ({
-          task_id: taskData.id,
+          task_id: insertedTask.id,
           tag_id: tagId,
         }))
 
