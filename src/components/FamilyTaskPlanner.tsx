@@ -18,6 +18,17 @@ interface Task {
   title: string
   assignee: string
   completed: boolean
+  status: string
+  importance?: number
+  urgency?: number
+  created_at: string
+  updated_at: string
+}
+
+interface TaskWithUser extends Task {
+  users: {
+    full_name: string
+  }
 }
 
 interface TagData {
@@ -78,7 +89,21 @@ const USER_ID = 'a0000000-0000-0000-0000-000000000001'
 export default function FamilyTaskPlanner() {
   const [selectedUser, setSelectedUser] = useState("All Tasks")
   const [activeTab, setActiveTab] = useState("home")
-  const [tasks, setTasks] = useState(mockTasks)
+  const [manualAddDay, setManualAddDay] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<Record<string, Task[]>>({
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+    saturday: [],
+    sunday: [],
+    anytime: [],
+    deck: [],
+    completed: [],
+  })
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     monday: true,
     tuesday: true,
@@ -92,8 +117,7 @@ export default function FamilyTaskPlanner() {
     completed: false,
   })
   const [draggedTask, setDraggedTask] = useState<{ task: Task; fromSection: string } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [tagMap, setTagMap] = useState<Record<string, string>>({}) // Maps tag names to IDs
+  const [tagMap, setTagMap] = useState<Record<string, string>>({})
   const [isLoadingTags, setIsLoadingTags] = useState(true)
 
   const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
@@ -109,6 +133,88 @@ export default function FamilyTaskPlanner() {
     { key: "deck", name: "Deck" },
     { key: "completed", name: "Completed Tasks" },
   ]
+
+  const dayMapping = { 
+    monday: 1, 
+    tuesday: 2, 
+    wednesday: 3, 
+    thursday: 4, 
+    friday: 5, 
+    saturday: 6, 
+    sunday: 0, 
+    anytime: 7 
+  }
+
+  // Fetch tasks when component mounts
+  useEffect(() => {
+    async function fetchTasks() {
+      try {
+        setIsLoadingTasks(true)
+        setError(null)
+
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('tasks')
+          .select(`
+            *,
+            users (
+              full_name
+            )
+          `)
+          .eq('team_id', TEAM_ID)
+          .order('created_at', { ascending: false })
+
+        if (tasksError) throw tasksError
+
+        // Transform tasks and group by section
+        const transformedTasks = (tasksData as unknown as TaskWithUser[]).reduce((acc, task) => {
+          const transformedTask: Task = {
+            id: task.id,
+            title: task.description,
+            assignee: task.users?.full_name || 'Unassigned',
+            completed: task.status === 'completed',
+            status: task.status || 'pending',
+            importance: task.importance,
+            urgency: task.urgency,
+            created_at: task.created_at || new Date().toISOString(),
+            updated_at: task.updated_at || new Date().toISOString(),
+          }
+
+          // Group tasks by day_of_week
+          if (task.status === 'completed') {
+            acc.completed.push(transformedTask)
+          } else if (task.status === 'deck') {
+            acc.deck.push(transformedTask)
+          } else {
+            // Map day_of_week number back to section key
+            const dayKey = Object.entries(dayMapping).find(([_, value]) => value === task.day_of_week)?.[0] || 'anytime'
+            acc[dayKey].push(transformedTask)
+          }
+
+          return acc
+        }, {
+          monday: [],
+          tuesday: [],
+          wednesday: [],
+          thursday: [],
+          friday: [],
+          saturday: [],
+          sunday: [],
+          anytime: [],
+          deck: [],
+          completed: [],
+        } as Record<string, Task[]>)
+
+        setTasks(transformedTasks)
+      } catch (err) {
+        console.error('Error fetching tasks:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load tasks')
+      } finally {
+        setIsLoadingTasks(false)
+      }
+    }
+
+    fetchTasks()
+  }, []) // Only fetch on mount
 
   // Fetch tags when component mounts
   useEffect(() => {
@@ -144,7 +250,7 @@ export default function FamilyTaskPlanner() {
 
   const filterTasks = (sectionTasks: Task[]) => {
     if (selectedUser === "All Tasks") return sectionTasks
-    return sectionTasks.filter((task) => task.assignee === selectedUser || task.assignee === "All")
+    return sectionTasks.filter((task) => task.assignee === selectedUser)
   }
 
   const toggleSection = (sectionKey: string) => {
@@ -154,13 +260,35 @@ export default function FamilyTaskPlanner() {
     }))
   }
 
-  const toggleTaskComplete = (taskId: string, sectionKey: string) => {
-    setTasks((prev) => ({
-      ...prev,
-      [sectionKey]: prev[sectionKey].map((task) =>
-        task.id === taskId ? { ...task, completed: !task.completed } : task,
-      ),
-    }))
+  const toggleTaskComplete = async (taskId: string, sectionKey: string) => {
+    try {
+      const task = tasks[sectionKey].find(t => t.id === taskId)
+      if (!task) return
+
+      const newStatus = task.completed ? 'pending' : 'completed'
+
+      // Update task in database
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId)
+
+      if (updateError) throw updateError
+
+      // Update local state
+      setTasks(prev => ({
+        ...prev,
+        [sectionKey]: prev[sectionKey].map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed, status: newStatus } : t
+        ),
+      }))
+    } catch (err) {
+      console.error('Error toggling task completion:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update task')
+    }
   }
 
   const handleDragStart = (task: Task, fromSection: string) => {
@@ -325,6 +453,84 @@ export default function FamilyTaskPlanner() {
     }
   }
 
+  const handleManualTaskSubmit = async (data: TaskFormData, sectionKey: string) => {
+    try {
+      setError(null)
+
+      // Map form tag IDs to database tag IDs
+      const databaseTagIds = data.tags
+        .map(tagName => tagMap[tagName])
+        .filter(Boolean)
+
+      // Prepare task data
+      const taskData = {
+        team_id: TEAM_ID,
+        submitted_by: USER_ID,
+        description: data.description,
+        importance: data.importance,
+        urgency: data.urgency,
+        day_of_week: dayMapping[sectionKey as keyof typeof dayMapping] || 7,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Insert task
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .insert(taskData)
+        .select()
+        .single()
+
+      if (taskError) throw taskError
+
+      // If we have tags, insert them
+      if (databaseTagIds.length > 0) {
+        const tagInserts = databaseTagIds.map(tagId => ({
+          task_id: task.id,
+          tag_id: tagId,
+        }))
+
+        const { error: tagError } = await supabase
+          .from('task_tags')
+          .insert(tagInserts)
+
+        if (tagError) {
+          console.error('Error saving tags:', tagError)
+        }
+      }
+
+      // Add the new task to local state
+      const transformedTask: Task = {
+        id: task.id,
+        title: task.description,
+        assignee: 'You', // Temporary until we fetch the user name
+        completed: false,
+        status: 'pending',
+        importance: task.importance,
+        urgency: task.urgency,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+      }
+
+      setTasks(prev => ({
+        ...prev,
+        [sectionKey]: [transformedTask, ...prev[sectionKey]]
+      }))
+
+      // Close the form
+      setManualAddDay(null)
+
+      // Reset error state on success
+      setError(null)
+
+    } catch (err) {
+      console.error('Error saving task:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save task')
+      throw err
+    }
+  }
+
   const TaskItem = ({ task, sectionKey }: { task: Task; sectionKey: string }) => (
     <div
       className="flex items-center gap-3 py-2 hover:bg-blue-50 rounded cursor-move"
@@ -358,7 +564,7 @@ export default function FamilyTaskPlanner() {
           className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-100 mr-2"
           onClick={(e) => {
             e.stopPropagation()
-            // Add task functionality would go here
+            setManualAddDay(section.key)
           }}
         >
           <Plus className="w-4 h-4" />
@@ -397,39 +603,46 @@ export default function FamilyTaskPlanner() {
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
-            {sections.map((section) => {
-              const filteredTasks = filterTasks(tasks[section.key])
-              if (filteredTasks.length === 0 && selectedUser !== "All Tasks" && section.key !== "completed") return null
 
-              return (
-                <Collapsible
-                  key={section.key}
-                  open={openSections[section.key]}
-                  onOpenChange={() => toggleSection(section.key)}
-                  className="mb-4"
-                >
-                  <div
-                    className="border-b border-gray-100 pb-2"
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, section.key)}
+            {isLoadingTasks ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-gray-500">Loading tasks...</p>
+              </div>
+            ) : (
+              sections.map((section) => {
+                const filteredTasks = filterTasks(tasks[section.key])
+                if (filteredTasks.length === 0 && selectedUser !== "All Tasks" && section.key !== "completed") return null
+
+                return (
+                  <Collapsible
+                    key={section.key}
+                    open={openSections[section.key]}
+                    onOpenChange={() => toggleSection(section.key)}
+                    className="mb-4"
                   >
-                    <SectionHeader section={section} taskCount={filteredTasks.length} />
+                    <div
+                      className="border-b border-gray-100 pb-2"
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, section.key)}
+                    >
+                      <SectionHeader section={section} taskCount={filteredTasks.length} />
 
-                    <CollapsibleContent className="mt-2">
-                      {filteredTasks.length > 0 ? (
-                        <div className="space-y-1 pl-2">
-                          {filteredTasks.map((task) => (
-                            <TaskItem key={task.id} task={task} sectionKey={section.key} />
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic py-2 pl-2">No tasks</p>
-                      )}
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              )
-            })}
+                      <CollapsibleContent className="mt-2">
+                        {filteredTasks.length > 0 ? (
+                          <div className="space-y-1 pl-2">
+                            {filteredTasks.map((task) => (
+                              <TaskItem key={task.id} task={task} sectionKey={section.key} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 italic py-2 pl-2">No tasks</p>
+                        )}
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                )
+              })
+            )}
           </div>
         </ScrollArea>
       </main>
@@ -466,6 +679,15 @@ export default function FamilyTaskPlanner() {
           users={users.filter(u => u !== "All Tasks")}
           onClose={() => setActiveTab("home")}
           onSubmit={handleTaskSubmit}
+        />
+      )}
+
+      {/* Manual Add Task Form */}
+      {manualAddDay && (
+        <TaskForm
+          users={users.filter(u => u !== "All Tasks")}
+          onClose={() => setManualAddDay(null)}
+          onSubmit={(data) => handleManualTaskSubmit(data, manualAddDay)}
         />
       )}
 
