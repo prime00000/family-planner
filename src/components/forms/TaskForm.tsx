@@ -65,7 +65,11 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
 
         if (error) throw error
 
-        setFamilyMembers(members || [])
+        setFamilyMembers(members?.map(m => ({
+          id: m.id,
+          full_name: m.full_name || 'Unknown'
+        })) || [])
+
       } catch (err) {
         console.error('Error fetching family members:', err)
       } finally {
