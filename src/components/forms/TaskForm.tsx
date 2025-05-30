@@ -191,7 +191,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
           ${isOpen ? 'translate-y-0' : 'translate-y-full'}
         `}
       >
-        <div className="p-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-4 pb-24 sm:pb-6 max-h-[85vh] overflow-y-auto">
           {/* Success Message Overlay */}
           {showSuccess && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center animate-fade-in z-[60]">
