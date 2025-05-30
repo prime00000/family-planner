@@ -168,7 +168,13 @@ export default function FamilyTaskPlanner() {
 
         setTasks(transformedTasks)
       } catch (err) {
-        console.error('Error fetching tasks:', err)
+        console.error('Error fetching tasks:', {
+          message: err.message,
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          fullError: err
+        })
         setError(err instanceof Error ? err.message : 'Failed to load tasks')
       } finally {
         setIsLoadingTasks(false)
@@ -200,7 +206,13 @@ export default function FamilyTaskPlanner() {
 
         setTagMap(newTagMap)
       } catch (err) {
-        console.error('Error fetching tags:', err)
+        console.error('Error fetching tags:', {
+          message: err.message,
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          fullError: err
+        })
         setError(err instanceof Error ? err.message : 'Failed to load tags')
       } finally {
         setIsLoadingTags(false)
@@ -248,7 +260,13 @@ export default function FamilyTaskPlanner() {
         ),
       }))
     } catch (err) {
-      console.error('Error toggling task completion:', err)
+      console.error('Error toggling task completion:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        fullError: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to update task')
     }
   }
@@ -334,7 +352,13 @@ export default function FamilyTaskPlanner() {
       setError(null)
 
     } catch (err) {
-      console.error('Error saving task:', err)
+      console.error('Error saving task:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        fullError: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to save task')
       throw err // Let the form handle the error display
     }
@@ -371,7 +395,13 @@ export default function FamilyTaskPlanner() {
       setError(null)
 
     } catch (err) {
-      console.error('Error saving objective:', err)
+      console.error('Error saving objective:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        fullError: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to save objective')
       throw err // Let the form handle the error display
     }
@@ -410,7 +440,13 @@ export default function FamilyTaskPlanner() {
       setError(null)
 
     } catch (err) {
-      console.error('Error saving maintenance item:', err)
+      console.error('Error saving maintenance item:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        fullError: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to save maintenance item')
       throw err // Let the form handle the error display
     }
@@ -478,7 +514,13 @@ export default function FamilyTaskPlanner() {
       setError(null)
 
     } catch (err) {
-      console.error('Error saving task:', err)
+      console.error('Error saving task:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        fullError: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to save task')
       throw err
     }
