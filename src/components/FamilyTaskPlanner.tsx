@@ -36,53 +36,6 @@ interface TagData {
   name: string
 }
 
-const mockTasks: Record<string, Task[]> = {
-  monday: [
-    { id: "1", title: "Take out trash", assignee: "Kurt", completed: false },
-    { id: "2", title: "Pack lunch for school", assignee: "Wife", completed: false },
-  ],
-  tuesday: [
-    { id: "3", title: "Soccer practice pickup", assignee: "Wife", completed: false },
-    { id: "4", title: "Math homework", assignee: "Child1", completed: false },
-  ],
-  wednesday: [
-    { id: "5", title: "Grocery shopping", assignee: "Kurt", completed: false },
-    { id: "6", title: "Piano lesson", assignee: "Child2", completed: false },
-  ],
-  thursday: [
-    { id: "7", title: "Laundry", assignee: "Wife", completed: false },
-    { id: "8", title: "Science project", assignee: "Child1", completed: false },
-  ],
-  friday: [
-    { id: "9", title: "Movie night prep", assignee: "Kurt", completed: false },
-    { id: "10", title: "Clean room", assignee: "Child2", completed: false },
-  ],
-  saturday: [
-    { id: "11", title: "Family bike ride", assignee: "All", completed: false },
-    { id: "12", title: "Yard work", assignee: "Kurt", completed: false },
-  ],
-  sunday: [
-    { id: "13", title: "Meal prep for week", assignee: "Wife", completed: false },
-    { id: "14", title: "Family game time", assignee: "All", completed: false },
-  ],
-  anytime: [
-    { id: "15", title: "Fix leaky faucet", assignee: "Kurt", completed: false },
-    { id: "16", title: "Organize closet", assignee: "Wife", completed: false },
-    { id: "17", title: "Read 30 minutes", assignee: "Child1", completed: false },
-  ],
-  deck: [
-    { id: "18", title: "Paint the fence", assignee: "Kurt", completed: false },
-    { id: "19", title: "Plan summer vacation", assignee: "Wife", completed: false },
-    { id: "20", title: "Learn new recipe", assignee: "Wife", completed: false },
-  ],
-  completed: [
-    { id: "21", title: "Dentist appointment", assignee: "Child2", completed: true },
-    { id: "22", title: "Car oil change", assignee: "Kurt", completed: true },
-    { id: "23", title: "School permission slip", assignee: "Wife", completed: true },
-  ],
-}
-
-// Constants for now - would come from auth/context later
 const TEAM_ID = 'ada25a92-25fa-4ca2-8d35-eb9b71f97e4b'
 const USER_ID = 'a0000000-0000-0000-0000-000000000001'
 
@@ -186,7 +139,7 @@ export default function FamilyTaskPlanner() {
             acc.deck.push(transformedTask)
           } else {
             // Map day_of_week number back to section key
-            const dayKey = Object.entries(dayMapping).find(([_, value]) => value === task.day_of_week)?.[0] || 'anytime'
+            const dayKey = Object.entries(dayMapping).find(([, value]) => value === task.day_of_week)?.[0] || 'anytime'
             acc[dayKey].push(transformedTask)
           }
 
@@ -214,7 +167,7 @@ export default function FamilyTaskPlanner() {
     }
 
     fetchTasks()
-  }, []) // Only fetch on mount
+  }, [dayMapping])
 
   // Fetch tags when component mounts
   useEffect(() => {
