@@ -226,9 +226,8 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
               <Select
                 value={formData.assignee_id}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, assignee_id: value }))}
-                disabled={isLoadingMembers}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" disabled={isLoadingMembers}>
                   <SelectValue>
                     {isLoadingMembers ? (
                       "Loading family members..."
