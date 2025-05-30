@@ -215,26 +215,6 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Describe your task..."
               />
-              {isManualTask && (
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleSubmit(true, false)}
-                  >
-                    Quick Submit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleSubmit(true, true)}
-                  >
-                    Quick Submit +
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* Assignee Selection - Always shown for manual tasks */}
