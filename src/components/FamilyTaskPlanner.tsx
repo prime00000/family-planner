@@ -13,6 +13,13 @@ import { ObjectiveForm, type ObjectiveFormData } from "@/components/forms/Object
 import { MaintenanceForm, type MaintenanceFormData } from "@/components/forms/MaintenanceForm"
 import { supabase } from "@/lib/supabase"
 
+type SupabaseError = {
+  message?: string;
+  code?: string;
+  details?: unknown;
+  hint?: string;
+};
+
 interface Task {
   id: string
   title: string
@@ -170,9 +177,9 @@ export default function FamilyTaskPlanner() {
       } catch (err) {
         console.error('Error fetching tasks:', {
           message: err instanceof Error ? err.message : 'Unknown error',
-          code: (err as any)?.code,
-          details: (err as any)?.details,
-          hint: (err as any)?.hint,
+          code: (err as SupabaseError)?.code,
+          details: (err as SupabaseError)?.details,
+          hint: (err as SupabaseError)?.hint,
           fullError: err
         })
         setError(err instanceof Error ? err.message : 'Failed to load tasks')
@@ -208,9 +215,9 @@ export default function FamilyTaskPlanner() {
       } catch (err) {
         console.error('Error fetching tags:', {
           message: err instanceof Error ? err.message : 'Unknown error',
-          code: (err as any)?.code,
-          details: (err as any)?.details,
-          hint: (err as any)?.hint,
+          code: (err as SupabaseError)?.code,
+          details: (err as SupabaseError)?.details,
+          hint: (err as SupabaseError)?.hint,
           fullError: err
         })
         setError(err instanceof Error ? err.message : 'Failed to load tags')
@@ -262,9 +269,9 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error toggling task completion:', {
         message: err instanceof Error ? err.message : 'Unknown error',
-        code: (err as any)?.code,
-        details: (err as any)?.details,
-        hint: (err as any)?.hint,
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to update task')
@@ -354,9 +361,9 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error saving task:', {
         message: err instanceof Error ? err.message : 'Unknown error',
-        code: (err as any)?.code,
-        details: (err as any)?.details,
-        hint: (err as any)?.hint,
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to save task')
@@ -397,9 +404,9 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error saving objective:', {
         message: err instanceof Error ? err.message : 'Unknown error',
-        code: (err as any)?.code,
-        details: (err as any)?.details,
-        hint: (err as any)?.hint,
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to save objective')
@@ -442,9 +449,9 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error saving maintenance item:', {
         message: err instanceof Error ? err.message : 'Unknown error',
-        code: (err as any)?.code,
-        details: (err as any)?.details,
-        hint: (err as any)?.hint,
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to save maintenance item')
@@ -516,9 +523,9 @@ export default function FamilyTaskPlanner() {
     } catch (err) {
       console.error('Error saving task:', {
         message: err instanceof Error ? err.message : 'Unknown error',
-        code: (err as any)?.code,
-        details: (err as any)?.details,
-        hint: (err as any)?.hint,
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to save task')
