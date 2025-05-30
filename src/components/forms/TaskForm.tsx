@@ -112,12 +112,14 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
       return // Add proper validation feedback later
     }
 
-    // For quick submit, only send description
+    // For quick submit, only send description and assignee
     const submitData = quickSubmit ? {
       description: formData.description,
       tags: [],
+      assignee_id: formData.assignee_id, // Include assignee_id even in quick submit
     } : formData
 
+    console.log('Submitting with assignee_id:', formData.assignee_id)
     onSubmit(submitData, andContinue)
     setShowSuccess(true)
     
@@ -282,6 +284,26 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
             {isManualTask ? (
               // Manual task mode - show collapsible more options
               <div>
+                {/* Quick Submit buttons for manual tasks - primary action */}
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => handleSubmit(true, false)}
+                  >
+                    Quick Submit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => handleSubmit(true, true)}
+                  >
+                    Quick Submit +
+                  </Button>
+                </div>
+
                 <Button
                   variant="ghost"
                   type="button"
@@ -296,6 +318,29 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                 
                 {showMoreOptions && (
                   <div className="space-y-6 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Related Objective
+                      </label>
+                      <Select
+                        value={formData.objectiveId}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, objectiveId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SAMPLE_OBJECTIVES.map(objective => (
+                            <SelectItem key={objective.id} value={objective.id}>
+                              {objective.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Tags
@@ -351,27 +396,21 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Related Objective
-                      </label>
-                      <Select
-                        value={formData.objectiveId}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, objectiveId: value }))}
+                    {/* Regular Submit buttons moved inside More options */}
+                    <div className="flex gap-3 pt-6 mt-8 border-t">
+                      <Button
+                        className="flex-1 h-12 text-base"
+                        onClick={() => handleSubmit(false, false)}
                       >
-                        <SelectTrigger>
-                          <SelectValue>
-                            {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SAMPLE_OBJECTIVES.map(objective => (
-                            <SelectItem key={objective.id} value={objective.id}>
-                              {objective.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        Submit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 h-12 text-base"
+                        onClick={() => handleSubmit(false, true)}
+                      >
+                        Submit +
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -456,24 +495,25 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Regular Submit buttons for non-manual tasks */}
+                <div className="flex gap-3 pt-6 mt-8 border-t">
+                  <Button
+                    className="flex-1 h-12 text-base"
+                    onClick={() => handleSubmit(false, false)}
+                  >
+                    Submit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-12 text-base"
+                    onClick={() => handleSubmit(false, true)}
+                  >
+                    Submit +
+                  </Button>
+                </div>
               </>
             )}
-
-            <div className="flex gap-3 pt-6 mt-8 border-t">
-              <Button
-                className="flex-1 h-12 text-base"
-                onClick={() => handleSubmit(false, false)}
-              >
-                Submit
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 h-12 text-base"
-                onClick={() => handleSubmit(false, true)}
-              >
-                Submit +
-              </Button>
-            </div>
           </div>
         </div>
       </div>
