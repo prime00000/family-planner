@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 interface TaskFormProps {
   onClose: () => void
   onSubmit: (data: TaskFormData, andContinue?: boolean) => void
+  defaultAssignee?: string
 }
 
 export interface TaskFormData {
@@ -43,11 +44,12 @@ const SAMPLE_OBJECTIVES = [
   { id: 'obj4', title: 'Regular family activities' },
 ]
 
-export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
+export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) {
   const { user } = useAuth()
   const [formData, setFormData] = useState<TaskFormData>({
     description: '',
     tags: [],
+    assignee_id: defaultAssignee || '',
   })
   const [showSuccess, setShowSuccess] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -86,6 +88,16 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
       setIsOpen(true)
     })
   }, [])
+
+  useEffect(() => {
+    if (user && familyMembers.length > 0 && formData.assignee_id === 'assign_to_myself') {
+      setFormData(prev => ({ ...prev, assignee_id: user.id }))
+    }
+    // Also handle defaultAssignee if it's the user's ID
+    if (defaultAssignee && defaultAssignee !== 'unassigned' && !formData.assignee_id) {
+      setFormData(prev => ({ ...prev, assignee_id: defaultAssignee }))
+    }
+  }, [user, familyMembers, defaultAssignee, formData.assignee_id])
 
   const handleClose = () => {
     setIsOpen(false)

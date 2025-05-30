@@ -12,6 +12,7 @@ import { TaskForm, type TaskFormData } from "@/components/forms/TaskForm"
 import { ObjectiveForm, type ObjectiveFormData } from "@/components/forms/ObjectiveForm"
 import { MaintenanceForm, type MaintenanceFormData } from "@/components/forms/MaintenanceForm"
 import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/lib/auth/AuthContext"
 
 type SupabaseError = {
   message?: string;
@@ -55,6 +56,7 @@ const TEAM_ID = 'ada25a92-25fa-4ca2-8d35-eb9b71f97e4b'
 const USER_ID = 'a0000000-0000-0000-0000-000000000001'
 
 export default function FamilyTaskPlanner() {
+  const { user } = useAuth()
   const [selectedUser, setSelectedUser] = useState("All Tasks")
   const [activeTab, setActiveTab] = useState("home")
   const [manualAddDay, setManualAddDay] = useState<string | null>(null)
@@ -691,6 +693,7 @@ export default function FamilyTaskPlanner() {
         <TaskForm
           onClose={() => setManualAddDay(null)}
           onSubmit={(data) => handleManualTaskSubmit(data, manualAddDay)}
+          defaultAssignee={user?.id}
         />
       )}
 
