@@ -222,20 +222,35 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
               <Select
                 value={formData.assignee_id}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, assignee_id: value }))}
+                disabled={isLoadingMembers}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select assignee" />
+                  <SelectValue>
+                    {isLoadingMembers ? (
+                      "Loading family members..."
+                    ) : (
+                      formData.assignee_id ? 
+                        familyMembers.find(m => m.id === formData.assignee_id)?.full_name || "Unassigned"
+                        : "Select assignee"
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
-                  {user && (
-                    <SelectItem value={user.id}>Assign to Myself</SelectItem>
+                  {isLoadingMembers ? (
+                    <SelectItem value="" disabled>Loading...</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="">Unassigned</SelectItem>
+                      {user && (
+                        <SelectItem value={user.id}>Assign to Myself</SelectItem>
+                      )}
+                      {familyMembers.map(member => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.full_name}
+                        </SelectItem>
+                      ))}
+                    </>
                   )}
-                  {familyMembers.map(member => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.full_name}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
