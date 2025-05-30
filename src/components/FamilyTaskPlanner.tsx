@@ -33,6 +33,7 @@ interface TaskWithUser {
   urgency: number | null
   created_at: string | null
   updated_at: string | null
+  day_of_week: number | null  // Add this field to match the database schema
   users: {
     full_name: string
   }
