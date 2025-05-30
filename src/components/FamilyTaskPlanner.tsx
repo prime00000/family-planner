@@ -424,6 +424,9 @@ export default function FamilyTaskPlanner() {
         .map(tagName => tagMap[tagName])
         .filter(Boolean)
 
+      // Get the day_of_week value from dayMapping
+      const day_of_week = dayMapping[sectionKey as keyof typeof dayMapping] ?? 7
+
       // Prepare task data
       const taskData = {
         team_id: TEAM_ID,
@@ -431,25 +434,25 @@ export default function FamilyTaskPlanner() {
         description: data.description,
         importance: data.importance,
         urgency: data.urgency,
-        day_of_week: dayMapping[sectionKey as keyof typeof dayMapping] || 7,
+        assignee_id: data.assignee_id || null,
+        day_of_week,  // Use the mapped day value
+        objective_id: (data.objectiveId === 'none' || data.objectiveId?.startsWith('obj')) ? null : data.objectiveId,
         status: 'pending',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
       // Insert task
-      const { data: task, error: taskError } = await supabase
+      const { error: taskError } = await supabase
         .from('tasks')
         .insert(taskData)
-        .select()
-        .single()
 
       if (taskError) throw taskError
 
       // If we have tags, insert them
       if (databaseTagIds.length > 0) {
         const tagInserts = databaseTagIds.map(tagId => ({
-          task_id: task.id,
+          task_id: taskData.id,
           tag_id: tagId,
         }))
 
@@ -462,23 +465,8 @@ export default function FamilyTaskPlanner() {
         }
       }
 
-      // Add the new task to local state
-      const transformedTask: Task = {
-        id: task.id,
-        title: task.description,
-        assignee: 'You',
-        completed: false,
-        status: 'pending',
-        importance: task.importance ?? undefined,
-        urgency: task.urgency ?? undefined,
-        created_at: task.created_at || new Date().toISOString(),
-        updated_at: task.updated_at || new Date().toISOString(),
-      }
-
-      setTasks(prev => ({
-        ...prev,
-        [sectionKey]: [transformedTask, ...prev[sectionKey]]
-      }))
+      // Refresh all tasks to get the latest data with user joins
+      await fetchTasks()
 
       // Close the form
       setManualAddDay(null)

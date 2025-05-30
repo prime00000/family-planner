@@ -221,6 +221,39 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tags
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {TAGS.map(tag => (
+                  <div key={tag.id} className="flex items-center h-12">
+                    <label
+                      htmlFor={tag.id}
+                      className="flex items-center flex-1 h-full px-3 rounded hover:bg-gray-50 cursor-pointer"
+                    >
+                      <Checkbox
+                        id={tag.id}
+                        className="w-6 h-6"
+                        checked={formData.tags.includes(tag.id)}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: checked
+                              ? [...prev.tags, tag.id]
+                              : prev.tags.filter(t => t !== tag.id)
+                          }))
+                        }}
+                      />
+                      <span className="ml-3 text-sm text-gray-600">
+                        {tag.label}
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Assign to
               </label>
               <Select
@@ -301,39 +334,6 @@ export function TaskForm({ onClose, onSubmit }: TaskFormProps) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tags
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {TAGS.map(tag => (
-                  <div key={tag.id} className="flex items-center h-12">
-                    <label
-                      htmlFor={tag.id}
-                      className="flex items-center flex-1 h-full px-3 rounded hover:bg-gray-50 cursor-pointer"
-                    >
-                      <Checkbox
-                        id={tag.id}
-                        className="w-6 h-6"
-                        checked={formData.tags.includes(tag.id)}
-                        onCheckedChange={(checked) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            tags: checked
-                              ? [...prev.tags, tag.id]
-                              : prev.tags.filter(t => t !== tag.id)
-                          }))
-                        }}
-                      />
-                      <span className="ml-3 text-sm text-gray-600">
-                        {tag.label}
-                      </span>
-                    </label>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div className="flex gap-3 pt-6 mt-8 border-t">
