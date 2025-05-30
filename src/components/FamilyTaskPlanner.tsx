@@ -80,6 +80,7 @@ export default function FamilyTaskPlanner() {
   const [draggedTask, setDraggedTask] = useState<{ task: Task; fromSection: string } | null>(null)
   const [tagMap, setTagMap] = useState<Record<string, string>>({})
   const [isLoadingTags, setIsLoadingTags] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
   const sections = [
@@ -175,7 +176,7 @@ export default function FamilyTaskPlanner() {
     }
 
     fetchTasks()
-  }, [dayMapping])
+  }, [dayMapping, refreshTrigger])
 
   // Fetch tags when component mounts
   useEffect(() => {
@@ -467,8 +468,8 @@ export default function FamilyTaskPlanner() {
         }
       }
 
-      // Refresh all tasks to get the latest data with user joins
-      await fetchTasks()
+      // Trigger a refresh of all tasks
+      setRefreshTrigger(prev => prev + 1)
 
       // Close the form
       setManualAddDay(null)
