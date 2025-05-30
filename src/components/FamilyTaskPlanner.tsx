@@ -90,6 +90,12 @@ export default function FamilyTaskPlanner() {
   const [tagMap, setTagMap] = useState<Record<string, string>>({})
   const [isLoadingTags, setIsLoadingTags] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [undoNotification, setUndoNotification] = useState<{
+    message: string;
+    task: Task;
+    fromSection: string;
+    toSection: string;
+  } | null>(null)
 
   const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
   const sections = [
@@ -249,8 +255,39 @@ export default function FamilyTaskPlanner() {
       if (!task) return
 
       const newStatus = task.completed ? 'pending' : 'completed'
+      const originalSection = sectionKey
+      const targetSection = newStatus === 'completed' ? 'completed' : 
+        task.day_of_week ? Object.entries(dayMapping).find(([, value]) => value === task.day_of_week)?.[0] || 'anytime' : 'anytime'
 
-      // Update task in database
+      // Optimistically update UI
+      setTasks(prev => {
+        const updatedTasks = { ...prev }
+        // Remove from current section
+        updatedTasks[originalSection] = prev[originalSection].filter(t => t.id !== taskId)
+        // Add to target section with updated status
+        const updatedTask = {
+          ...task,
+          completed: !task.completed,
+          status: newStatus
+        }
+        updatedTasks[targetSection] = [...prev[targetSection], updatedTask]
+        return updatedTasks
+      })
+
+      // Show undo notification
+      setUndoNotification({
+        message: newStatus === 'completed' ? 'Task marked as complete' : 'Task marked as incomplete',
+        task,
+        fromSection: originalSection,
+        toSection: targetSection
+      })
+
+      // Clear notification after 3 seconds
+      setTimeout(() => {
+        setUndoNotification(null)
+      }, 3000)
+
+      // Update database
       const { error: updateError } = await supabase
         .from('tasks')
         .update({ 
@@ -261,13 +298,6 @@ export default function FamilyTaskPlanner() {
 
       if (updateError) throw updateError
 
-      // Update local state
-      setTasks(prev => ({
-        ...prev,
-        [sectionKey]: prev[sectionKey].map((t) =>
-          t.id === taskId ? { ...t, completed: !t.completed, status: newStatus } : t
-        ),
-      }))
     } catch (err) {
       console.error('Error toggling task completion:', {
         message: err instanceof Error ? err.message : 'Unknown error',
@@ -277,6 +307,44 @@ export default function FamilyTaskPlanner() {
         fullError: err
       })
       setError(err instanceof Error ? err.message : 'Failed to update task')
+    }
+  }
+
+  const handleUndoTaskCompletion = async (task: Task, fromSection: string, toSection: string) => {
+    try {
+      // Revert local state
+      setTasks(prev => {
+        const updatedTasks = { ...prev }
+        // Remove from current section
+        updatedTasks[toSection] = prev[toSection].filter(t => t.id !== task.id)
+        // Add back to original section
+        updatedTasks[fromSection] = [...prev[fromSection], task]
+        return updatedTasks
+      })
+
+      // Update database
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ 
+          status: task.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', task.id)
+
+      if (updateError) throw updateError
+
+      // Clear notification
+      setUndoNotification(null)
+
+    } catch (err) {
+      console.error('Error undoing task completion:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
+        fullError: err
+      })
+      setError(err instanceof Error ? err.message : 'Failed to undo task update')
     }
   }
 
@@ -597,6 +665,23 @@ export default function FamilyTaskPlanner() {
           </Select>
         </div>
       </header>
+
+      {/* Undo Notification */}
+      {undoNotification && (
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <span>{undoNotification.message}</span>
+          <button
+            onClick={() => handleUndoTaskCompletion(
+              undoNotification.task,
+              undoNotification.fromSection,
+              undoNotification.toSection
+            )}
+            className="text-blue-300 hover:text-blue-200 font-medium"
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
