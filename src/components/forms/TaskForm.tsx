@@ -11,6 +11,7 @@ interface TaskFormProps {
   onClose: () => void
   onSubmit: (data: TaskFormData, andContinue?: boolean) => void
   defaultAssignee?: string
+  isManualTask?: boolean
 }
 
 export interface TaskFormData {
@@ -44,7 +45,7 @@ const SAMPLE_OBJECTIVES = [
   { id: 'obj4', title: 'Regular family activities' },
 ]
 
-export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) {
+export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: TaskFormProps) {
   const { user } = useAuth()
   const [formData, setFormData] = useState<TaskFormData>({
     description: '',
@@ -55,6 +56,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) 
   const [isOpen, setIsOpen] = useState(false)
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
+  const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   useEffect(() => {
     // Fetch family members
@@ -202,7 +204,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) 
           <div className="space-y-6">
             <div>
               <label className="block text-lg font-medium text-gray-700 mb-2">
-                What is your new task? <span className="text-red-500">*</span>
+                {isManualTask ? "What is your new task?" : "What is your task?"} <span className="text-red-500">*</span>
               </label>
               <textarea
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -211,59 +213,29 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) 
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Describe your task..."
               />
-              <div className="flex gap-2 mt-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleSubmit(true, false)}
-                >
-                  Quick Submit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleSubmit(true, true)}
-                >
-                  Quick Submit +
-                </Button>
-              </div>
+              {isManualTask && (
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleSubmit(true, false)}
+                  >
+                    Quick Submit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleSubmit(true, true)}
+                  >
+                    Quick Submit +
+                  </Button>
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tags
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {TAGS.map(tag => (
-                  <div key={tag.id} className="flex items-center h-12">
-                    <label
-                      htmlFor={tag.id}
-                      className="flex items-center flex-1 h-full px-3 rounded hover:bg-gray-50 cursor-pointer"
-                    >
-                      <Checkbox
-                        id={tag.id}
-                        className="w-6 h-6"
-                        checked={formData.tags.includes(tag.id)}
-                        onCheckedChange={(checked) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            tags: checked
-                              ? [...prev.tags, tag.id]
-                              : prev.tags.filter(t => t !== tag.id)
-                          }))
-                        }}
-                      />
-                      <span className="ml-3 text-sm text-gray-600">
-                        {tag.label}
-                      </span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
+            {/* Assignee Selection - Always shown for manual tasks */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Assign to
@@ -278,6 +250,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) 
                       "Loading family members..."
                     ) : (
                       formData.assignee_id ? 
+                        formData.assignee_id === user?.id ? "Myself" :
                         familyMembers.find(m => m.id === formData.assignee_id)?.full_name || "Unassigned"
                         : "Select assignee"
                     )}
@@ -292,61 +265,199 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee }: TaskFormProps) 
                       {user && (
                         <SelectItem value={user.id}>Assign to Myself</SelectItem>
                       )}
-                      {familyMembers.map(member => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.full_name}
-                        </SelectItem>
-                      ))}
+                      {familyMembers
+                        .filter(member => member.id !== user?.id) // Filter out current user
+                        .map(member => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.full_name}
+                          </SelectItem>
+                        ))
+                      }
                     </>
                   )}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Importance
-              </label>
-              {renderRatingGroup(
-                'importance',
-                (value) => setFormData(prev => ({ ...prev, importance: value })),
-                formData.importance
-              )}
-            </div>
+            {isManualTask ? (
+              // Manual task mode - show collapsible more options
+              <div>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => setShowMoreOptions(!showMoreOptions)}
+                  className="w-full justify-between"
+                >
+                  More options
+                  <span className={`transform transition-transform ${showMoreOptions ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </Button>
+                
+                {showMoreOptions && (
+                  <div className="space-y-6 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tags
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {TAGS.map(tag => (
+                          <div key={tag.id} className="flex items-center h-12">
+                            <label
+                              htmlFor={tag.id}
+                              className="flex items-center flex-1 h-full px-3 rounded hover:bg-gray-50 cursor-pointer"
+                            >
+                              <Checkbox
+                                id={tag.id}
+                                className="w-6 h-6"
+                                checked={formData.tags.includes(tag.id)}
+                                onCheckedChange={(checked) => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    tags: checked
+                                      ? [...prev.tags, tag.id]
+                                      : prev.tags.filter(t => t !== tag.id)
+                                  }))
+                                }}
+                              />
+                              <span className="ml-3 text-sm text-gray-600">
+                                {tag.label}
+                              </span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Urgency
-              </label>
-              {renderRatingGroup(
-                'urgency',
-                (value) => setFormData(prev => ({ ...prev, urgency: value })),
-                formData.urgency
-              )}
-            </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Importance
+                      </label>
+                      {renderRatingGroup(
+                        'importance',
+                        (value) => setFormData(prev => ({ ...prev, importance: value })),
+                        formData.importance
+                      )}
+                    </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Related Objective
-              </label>
-              <Select
-                value={formData.objectiveId}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, objectiveId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {SAMPLE_OBJECTIVES.map(objective => (
-                    <SelectItem key={objective.id} value={objective.id}>
-                      {objective.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Urgency
+                      </label>
+                      {renderRatingGroup(
+                        'urgency',
+                        (value) => setFormData(prev => ({ ...prev, urgency: value })),
+                        formData.urgency
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Related Objective
+                      </label>
+                      <Select
+                        value={formData.objectiveId}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, objectiveId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SAMPLE_OBJECTIVES.map(objective => (
+                            <SelectItem key={objective.id} value={objective.id}>
+                              {objective.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Regular task mode - show all options
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tags
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {TAGS.map(tag => (
+                      <div key={tag.id} className="flex items-center h-12">
+                        <label
+                          htmlFor={tag.id}
+                          className="flex items-center flex-1 h-full px-3 rounded hover:bg-gray-50 cursor-pointer"
+                        >
+                          <Checkbox
+                            id={tag.id}
+                            className="w-6 h-6"
+                            checked={formData.tags.includes(tag.id)}
+                            onCheckedChange={(checked) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: checked
+                                  ? [...prev.tags, tag.id]
+                                  : prev.tags.filter(t => t !== tag.id)
+                              }))
+                            }}
+                          />
+                          <span className="ml-3 text-sm text-gray-600">
+                            {tag.label}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Importance
+                  </label>
+                  {renderRatingGroup(
+                    'importance',
+                    (value) => setFormData(prev => ({ ...prev, importance: value })),
+                    formData.importance
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Urgency
+                  </label>
+                  {renderRatingGroup(
+                    'urgency',
+                    (value) => setFormData(prev => ({ ...prev, urgency: value })),
+                    formData.urgency
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Related Objective
+                  </label>
+                  <Select
+                    value={formData.objectiveId}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, objectiveId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SAMPLE_OBJECTIVES.map(objective => (
+                        <SelectItem key={objective.id} value={objective.id}>
+                          {objective.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
 
             <div className="flex gap-3 pt-6 mt-8 border-t">
               <Button

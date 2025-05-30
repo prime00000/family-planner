@@ -694,6 +694,7 @@ export default function FamilyTaskPlanner() {
           onClose={() => setManualAddDay(null)}
           onSubmit={(data) => handleManualTaskSubmit(data, manualAddDay)}
           defaultAssignee={user?.id}
+          isManualTask={true}
         />
       )}
 
