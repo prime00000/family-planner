@@ -30,7 +30,7 @@ interface NewItem {
   importance: number | null
   urgency?: number | null
   submitted_by: string
-  created_at: string
+  created_at: string | null
   tags?: Array<{
     name: string
     color: string
@@ -292,8 +292,8 @@ export default function NewItemsReview() {
             description: string; 
             importance: string | number | null; 
             urgency: string | number | null;
-            created_at: string;
-            users: { full_name: string } | null;
+            created_at: string | null;
+            users: { full_name: string | null } | null;
           }) => {
             const importance = obj.importance ? parseInt(String(obj.importance), 10) : null
             const urgency = obj.urgency ? parseInt(String(obj.urgency), 10) : null
@@ -315,8 +315,8 @@ export default function NewItemsReview() {
             importance: string | number | null;
             urgency: string | number | null;
             objective_id: string | null;
-            created_at: string;
-            users: { full_name: string } | null;
+            created_at: string | null;
+            users: { full_name: string | null } | null;
             task_tags: Array<{
               tags: {
                 name: string;
@@ -355,8 +355,8 @@ export default function NewItemsReview() {
             description: string;
             importance: string | number | null;
             frequency: string;
-            created_at: string;
-            users: { full_name: string } | null;
+            created_at: string | null;
+            users: { full_name: string | null } | null;
             maintenance_tags: Array<{
               tags: {
                 name: string;
