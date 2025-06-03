@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { TEAM_ID } from '@/lib/constants'
 
 interface TaskFormProps {
   onClose: () => void
@@ -28,21 +29,17 @@ interface FamilyMember {
   full_name: string
 }
 
+interface Objective {
+  id: string
+  description: string
+}
+
 const TAGS = [
   { id: 'health', label: 'Health' },
   { id: 'shopping', label: 'Shopping' },
   { id: 'education', label: 'Education' },
   { id: 'chores', label: 'Chores' },
   { id: 'other', label: 'Other' },
-]
-
-// Placeholder objectives for now
-const SAMPLE_OBJECTIVES = [
-  { id: 'none', title: 'None' },
-  { id: 'obj1', title: 'Get healthier as a family' },
-  { id: 'obj2', title: 'Improve home organization' },
-  { id: 'obj3', title: 'Better school-life balance' },
-  { id: 'obj4', title: 'Regular family activities' },
 ]
 
 export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: TaskFormProps) {
@@ -55,7 +52,9 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
   const [showSuccess, setShowSuccess] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
+  const [objectives, setObjectives] = useState<Objective[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
+  const [isLoadingObjectives, setIsLoadingObjectives] = useState(true)
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   useEffect(() => {
@@ -81,7 +80,29 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
       }
     }
 
+    // Fetch objectives
+    async function fetchObjectives() {
+      try {
+        setIsLoadingObjectives(true)
+        const { data: objectives, error } = await supabase
+          .from('objectives')
+          .select('id, description')
+          .eq('team_id', TEAM_ID)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        setObjectives(objectives || [])
+      } catch (err) {
+        console.error('Error fetching objectives:', err)
+      } finally {
+        setIsLoadingObjectives(false)
+      }
+    }
+
     fetchFamilyMembers()
+    fetchObjectives()
   }, [])
 
   useEffect(() => {
@@ -308,13 +329,16 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                       >
                         <SelectTrigger>
                           <SelectValue>
-                            {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
+                            {formData.objectiveId === 'none' 
+                              ? 'None' 
+                              : objectives.find(o => o.id === formData.objectiveId)?.description || 'Select an objective'}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {SAMPLE_OBJECTIVES.map(objective => (
+                          <SelectItem value="none">None</SelectItem>
+                          {objectives.map(objective => (
                             <SelectItem key={objective.id} value={objective.id}>
-                              {objective.title}
+                              {objective.description}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -463,13 +487,16 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                   >
                     <SelectTrigger>
                       <SelectValue>
-                        {SAMPLE_OBJECTIVES.find(o => o.id === formData.objectiveId)?.title || 'Select an objective'}
+                        {formData.objectiveId === 'none' 
+                          ? 'None' 
+                          : objectives.find(o => o.id === formData.objectiveId)?.description || 'Select an objective'}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {SAMPLE_OBJECTIVES.map(objective => (
+                      <SelectItem value="none">None</SelectItem>
+                      {objectives.map(objective => (
                         <SelectItem key={objective.id} value={objective.id}>
-                          {objective.title}
+                          {objective.description}
                         </SelectItem>
                       ))}
                     </SelectContent>

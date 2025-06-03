@@ -389,7 +389,7 @@ export default function FamilyTaskPlanner() {
         importance: data.importance,
         urgency: data.urgency,
         assignee_id: data.assignee_id || null,  // Include assignee_id
-        objective_id: (data.objectiveId === 'none' || data.objectiveId?.startsWith('obj')) ? null : data.objectiveId,
+        objective_id: data.objectiveId === 'none' ? null : data.objectiveId,
         status: 'pending',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -549,7 +549,7 @@ export default function FamilyTaskPlanner() {
         urgency: data.urgency,
         assignee_id: data.assignee_id || null,
         day_of_week,  // Use the mapped day value
-        objective_id: (data.objectiveId === 'none' || data.objectiveId?.startsWith('obj')) ? null : data.objectiveId,
+        objective_id: data.objectiveId === 'none' ? null : data.objectiveId,
         status: 'pending',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -748,18 +748,49 @@ export default function FamilyTaskPlanner() {
             { icon: Wrench, key: "maintenance", label: "Maintenance" },
             { icon: CalendarIcon, key: "plan", label: "Plan", isAdmin: true },
           ].map(({ icon: Icon, key, label, isAdmin }) => (
-            <Button
-              key={key}
-              variant="ghost"
-              size="sm"
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-2 ${
-                activeTab === key ? "text-blue-600 bg-blue-50" : isAdmin ? "text-gray-400" : "text-gray-600"
-              }`}
-              onClick={() => setActiveTab(key)}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="text-xs font-medium">{label}</span>
-            </Button>
+            isAdmin ? (
+              isAdmin && (
+                <Button
+                  key={key}
+                  variant="ghost"
+                  size="sm"
+                  className={`flex flex-col items-center gap-1 h-auto py-2 px-2 ${
+                    activeTab === key 
+                      ? key === "plan" 
+                        ? "text-purple-600 bg-purple-50" 
+                        : "text-blue-600 bg-blue-50"
+                      : isAdmin 
+                        ? "text-purple-600" 
+                        : "text-gray-600"
+                  }`}
+                  onClick={() => {
+                    if (key === "plan") {
+                      window.location.href = "/admin/planning"
+                    } else {
+                      setActiveTab(key)
+                    }
+                  }}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-xs font-medium">{label}</span>
+                </Button>
+              )
+            ) : (
+              <Button
+                key={key}
+                variant="ghost"
+                size="sm"
+                className={`flex flex-col items-center gap-1 h-auto py-2 px-2 ${
+                  activeTab === key 
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-600"
+                }`}
+                onClick={() => setActiveTab(key)}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="text-xs font-medium">{label}</span>
+              </Button>
+            )
           ))}
         </div>
       </nav>
