@@ -121,11 +121,7 @@ const ItemTags = ({ tags }: { tags?: Array<{ name: string, color: string }> }) =
             <Badge
               key={tag.name}
               variant={luminance ? 'default' : 'secondary'}
-              className={`text-xs ${luminance ? 'bg-opacity-90' : ''}`}
-              style={{
-                backgroundColor: tag.color,
-                color: getContrastColor(tag.color)
-              }}
+              className={`text-xs ${luminance ? 'bg-opacity-90' : ''} [background-color:${tag.color}] [color:${getContrastColor(tag.color)}]`}
             >
               {tag.name}
             </Badge>
