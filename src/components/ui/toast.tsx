@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useToast, type Toast } from './use-toast'
 
-function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) {
+function ToastItem({ toast }: { toast: Toast }) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -44,7 +44,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
 }
 
 export function Toaster() {
-  const { toasts, removeToast } = useToast()
+  const { toasts } = useToast()
 
   return (
     <div className="fixed bottom-0 right-0 z-50 p-4 space-y-4">
@@ -52,7 +52,6 @@ export function Toaster() {
         <ToastItem
           key={toast.id}
           toast={toast}
-          onRemove={() => removeToast(toast.id)}
         />
       ))}
     </div>

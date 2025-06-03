@@ -41,7 +41,7 @@ function LoadingState() {
 
 export default function AdminPlanningPage() {
   const router = useRouter()
-  const { user, isLoading, isAdmin } = useAuth()
+  const { isLoading, isAdmin } = useAuth()
   const { phase, setPhase } = usePlanningStore()
   
   console.log('Current phase:', phase)

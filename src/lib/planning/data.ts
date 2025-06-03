@@ -16,6 +16,24 @@ export interface PlanningTask {
   }[]
 }
 
+interface DatabaseTask {
+  id: string
+  description: string
+  status: string
+  importance: number | null
+  urgency: number | null
+  created_at: string
+  updated_at: string
+  users: {
+    full_name: string
+  } | null
+  task_tags: Array<{
+    tags: {
+      name: string
+    }
+  }> | null
+}
+
 interface PastWeekTasks {
   completed: PlanningTask[]
   incomplete: PlanningTask[]
@@ -106,7 +124,7 @@ export async function getPastWeekTasks(teamId: string): Promise<PastWeekTasks> {
   console.log('Raw tasks from DB:', tasks)
 
   // Transform and split tasks into completed and incomplete
-  const transformedTasks = (tasks || []).map((task: any): PlanningTask => ({
+  const transformedTasks = (tasks || []).map((task: DatabaseTask): PlanningTask => ({
     id: task.id,
     description: task.description,
     status: task.status,
@@ -115,7 +133,7 @@ export async function getPastWeekTasks(teamId: string): Promise<PastWeekTasks> {
     created_at: task.created_at,
     updated_at: task.updated_at,
     assignee: task.users || { full_name: 'Unassigned' },
-    tags: task.task_tags?.map((tt: any) => tt.tags) || []
+    tags: task.task_tags?.map(tt => tt.tags) || []
   }))
 
   return {

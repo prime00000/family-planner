@@ -148,15 +148,15 @@ const getContrastColor = (bgColor: string) => {
 
 export default function NewItemsReview() {
   const router = useRouter()
-  const { user, isLoading, isAdmin } = useAuth()
-  const { setPhase, addReviewedItem, addDecisionLog } = usePlanningStore()
+  const { isLoading, isAdmin } = useAuth()
+  const { setPhase, addDecisionLog } = usePlanningStore()
   const { toast } = useToast()
   
   const [activeTab, setActiveTab] = useState('objectives')
   const [selectedItems, setSelectedItems] = useState(new Set<string>())
   const [aiCommand, setAiCommand] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [showingSuggestions, setShowingSuggestions] = useState(false)
+  const [showingSuggestions] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const [newItems, setNewItems] = useState<NewItemsData>({
     objectives: [],
@@ -232,7 +232,7 @@ export default function NewItemsReview() {
         console.log('Fetched objectives:', objectives)
 
         // Create objectives lookup map
-        const objMap = objectives.reduce((acc: Record<string, string>, obj: any) => {
+        const objMap = objectives.reduce((acc: Record<string, string>, obj: { id: string; description: string }) => {
           if (obj.id) {
             acc[obj.id] = obj.description
           }
@@ -291,7 +291,14 @@ export default function NewItemsReview() {
 
         // Transform data with proper type handling
         const transformedData = {
-          objectives: objectives.map((obj: any) => {
+          objectives: objectives.map((obj: { 
+            id: string; 
+            description: string; 
+            importance: string | number | null; 
+            urgency: string | number | null;
+            created_at: string;
+            users: { full_name: string } | null;
+          }) => {
             const importance = obj.importance ? parseInt(String(obj.importance), 10) : null
             const urgency = obj.urgency ? parseInt(String(obj.urgency), 10) : null
             
@@ -306,7 +313,21 @@ export default function NewItemsReview() {
               created_at: obj.created_at
             }
           }),
-          tasks: tasks.map((task: any) => {
+          tasks: tasks.map((task: {
+            id: string;
+            description: string;
+            importance: string | number | null;
+            urgency: string | number | null;
+            objective_id: string | null;
+            created_at: string;
+            users: { full_name: string } | null;
+            task_tags: Array<{
+              tags: {
+                name: string;
+                color: string;
+              }
+            }> | null;
+          }) => {
             const importance = task.importance ? parseInt(String(task.importance), 10) : null
             const urgency = task.urgency ? parseInt(String(task.urgency), 10) : null
             const objectiveDesc = task.objective_id ? objMap[task.objective_id] : undefined
@@ -327,13 +348,26 @@ export default function NewItemsReview() {
               objective_description: objectiveDesc,
               submitted_by: task.users?.full_name || 'Unknown',
               created_at: task.created_at,
-              tags: task.task_tags?.map((tt: any) => ({
+              tags: task.task_tags?.map(tt => ({
                 name: tt.tags.name,
                 color: tt.tags.color
               })) || []
             }
           }),
-          maintenance: maintenance.map((item: any) => {
+          maintenance: maintenance.map((item: {
+            id: string;
+            description: string;
+            importance: string | number | null;
+            frequency: string;
+            created_at: string;
+            users: { full_name: string } | null;
+            maintenance_tags: Array<{
+              tags: {
+                name: string;
+                color: string;
+              }
+            }> | null;
+          }) => {
             const importance = item.importance ? parseInt(String(item.importance), 10) : null
             
             console.log('Transforming maintenance item:', {
@@ -348,7 +382,7 @@ export default function NewItemsReview() {
               frequency: item.frequency,
               submitted_by: item.users?.full_name || 'Unknown',
               created_at: item.created_at,
-              tags: item.maintenance_tags?.map((mt: any) => ({
+              tags: item.maintenance_tags?.map(mt => ({
                 name: mt.tags.name,
                 color: mt.tags.color
               })) || []
@@ -373,7 +407,7 @@ export default function NewItemsReview() {
     if (!isLoading && isAdmin) {
       fetchNewItems()
     }
-  }, [isLoading, isAdmin, toast])
+  }, [isLoading, isAdmin, toast, isFetching])
 
   const handleSelectItem = (itemId: string) => {
     const newSelected = new Set(selectedItems)

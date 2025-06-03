@@ -6,13 +6,24 @@ export type PlanningPhase = typeof PLANNING_PHASES[keyof typeof PLANNING_PHASES]
 interface ReviewedItem {
   id: string
   type: 'objective' | 'task' | 'maintenance'
-  adjustments?: any
+  adjustments?: {
+    importance?: number
+    urgency?: number
+    tags?: string[]
+    status?: string
+  }
 }
 
 interface NewItemsData {
   reviewedItems: ReviewedItem[]
   adjustmentsMade: number
   decisionsLog: string[]
+}
+
+interface VibePlanData {
+  selectedDays: string[]
+  vibeNotes: string
+  energyLevel: number
 }
 
 interface PlanningState {
@@ -23,10 +34,13 @@ interface PlanningState {
       incompleteCount: number
     }
     new_items?: NewItemsData
-    vibe_plan?: any // TODO: Define vibe plan data structure
+    vibe_plan?: VibePlanData
   }
   setPhase: (phase: PlanningPhase) => void
-  updatePhaseData: (phase: PlanningPhase, data: any) => void
+  updatePhaseData: <T extends keyof PlanningState['phaseData']>(
+    phase: T,
+    data: Partial<NonNullable<PlanningState['phaseData'][T]>>
+  ) => void
   setNewItemsData: (data: NewItemsData) => void
   addReviewedItem: (item: ReviewedItem) => void
   addDecisionLog: (log: string) => void

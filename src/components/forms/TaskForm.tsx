@@ -54,7 +54,6 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
-  const [isLoadingObjectives, setIsLoadingObjectives] = useState(true)
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   useEffect(() => {
@@ -83,7 +82,6 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
     // Fetch objectives
     async function fetchObjectives() {
       try {
-        setIsLoadingObjectives(true)
         const { data: objectives, error } = await supabase
           .from('objectives')
           .select('id, description')
@@ -96,8 +94,6 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
         setObjectives(objectives || [])
       } catch (err) {
         console.error('Error fetching objectives:', err)
-      } finally {
-        setIsLoadingObjectives(false)
       }
     }
 

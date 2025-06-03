@@ -45,12 +45,6 @@ function parseAiCommand(command: string): ParsedCommand {
   return { action: 'unknown' }
 }
 
-interface UndoState {
-  archiveId: string
-  taskDescription: string
-  timeoutId: NodeJS.Timeout
-}
-
 interface TasksByAssignee {
   [assignee: string]: PlanningTask[]
 }
@@ -63,7 +57,6 @@ export function PastWeekReview() {
   const [error, setError] = useState<string | null>(null)
   const [aiCommand, setAiCommand] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const undoStateRef = useRef<UndoState | null>(null)
   const { updatePhaseData, setPhase } = usePlanningStore()
   const { toast } = useToast()
 
@@ -83,15 +76,6 @@ export function PastWeekReview() {
     if (b === 'Unassigned') return -1
     return a.localeCompare(b)
   })
-
-  // Clear any pending undo timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (undoStateRef.current?.timeoutId) {
-        clearTimeout(undoStateRef.current.timeoutId)
-      }
-    }
-  }, [])
 
   const refreshTasks = async () => {
     try {
@@ -131,7 +115,7 @@ export function PastWeekReview() {
 
   useEffect(() => {
     refreshTasks()
-  }, [updatePhaseData])
+  }, [updatePhaseData, refreshTasks])
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -149,33 +133,6 @@ export function PastWeekReview() {
       newSelected.delete(taskId)
     }
     setSelectedTasks(newSelected)
-  }
-
-  const handleUndo = async () => {
-    if (!undoStateRef.current) return
-
-    const { archiveId, timeoutId } = undoStateRef.current
-    clearTimeout(timeoutId)
-    undoStateRef.current = null
-
-    try {
-      setIsProcessing(true)
-      await restoreTaskFromArchive(archiveId)
-      await refreshTasks()
-      toast({
-        title: 'Task restored',
-        description: 'The task has been restored to your list'
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to restore task'
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: message
-      })
-    } finally {
-      setIsProcessing(false)
-    }
   }
 
   const handleMarkComplete = async (taskId: string, description: string) => {
@@ -404,7 +361,7 @@ export function PastWeekReview() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <span>📋</span> Didn't Get Done
+            <span>📋</span> Didn&apos;t Get Done
           </h2>
         </div>
 
