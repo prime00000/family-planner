@@ -32,18 +32,40 @@ interface NewItem {
   submitted_by: string
   created_at: string | null
   tags?: Array<{
+    id: string
     name: string
-    color: string
+    category: string
   }>
   frequency?: string
-  objective_id?: string
-  objective_description?: string
+  objective_id?: string | null
+  objective_description?: string | null
 }
 
 interface NewItemsData {
   objectives: NewItem[]
   tasks: NewItem[]
   maintenance: NewItem[]
+}
+
+interface TaskData {
+  id: string;
+  description: string;
+  importance: string;
+  urgency: string;
+  objective_id: string | null;
+  objectives: { 
+    id: string; 
+    description: string; 
+  } | null;
+  created_at: string;
+  users: { full_name: string };
+  task_tags: {
+    tags: {
+      id: string;
+      name: string;
+      category: string;
+    }
+  }[];
 }
 
 // Fix the importance/urgency icon components
@@ -238,7 +260,7 @@ export default function NewItemsReview() {
         console.log('Created objectives map:', objMap)
         setObjectivesMap(objMap)
 
-        // Fetch tasks with objective_id
+        // Fetch tasks with objectives
         const { data: tasks, error: taskError } = await supabase
           .from('tasks')
           .select(`
@@ -249,10 +271,15 @@ export default function NewItemsReview() {
             objective_id,
             created_at,
             users!submitted_by ( full_name ),
+            objectives (
+              id,
+              description
+            ),
             task_tags ( 
               tags ( 
+                id, 
                 name,
-                color
+                category 
               ) 
             )
           `)
@@ -309,30 +336,15 @@ export default function NewItemsReview() {
               created_at: obj.created_at
             }
           }),
-          tasks: tasks.map((task: {
-            id: string;
-            description: string;
-            importance: string | number | null;
-            urgency: string | number | null;
-            objective_id: string | null;
-            created_at: string | null;
-            users: { full_name: string | null } | null;
-            task_tags: Array<{
-              tags: {
-                name: string;
-                color: string;
-              }
-            }> | null;
-          }) => {
+          tasks: (tasks || []).map((task: TaskData) => {
             const importance = task.importance ? parseInt(String(task.importance), 10) : null
             const urgency = task.urgency ? parseInt(String(task.urgency), 10) : null
-            const objectiveDesc = task.objective_id ? objMap[task.objective_id] : undefined
             
             console.log('Transforming task:', {
               ...task,
               importance,
               urgency,
-              objectiveDesc
+              objectives: task.objectives
             })
             
             return {
@@ -341,13 +353,14 @@ export default function NewItemsReview() {
               importance,
               urgency,
               objective_id: task.objective_id,
-              objective_description: objectiveDesc,
+              objective_description: task.objectives?.description || null,
               submitted_by: task.users?.full_name || 'Unknown',
               created_at: task.created_at,
-              tags: task.task_tags?.map(tt => ({
+              tags: (task.task_tags || []).map(tt => ({
+                id: tt.tags.id,
                 name: tt.tags.name,
-                color: tt.tags.color
-              })) || []
+                category: tt.tags.category
+              }))
             }
           }),
           maintenance: maintenance.map((item: {
