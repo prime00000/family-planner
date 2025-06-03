@@ -456,50 +456,11 @@ export default function NewItemsReview() {
     setAiCommand('')
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === 0) return 'Today'
-    if (diffDays === 1) return 'Yesterday'
-    return `${diffDays} days ago`
-  }
-
   const tabs = [
     { id: 'objectives', label: <Lightbulb className="h-4 w-4" />, count: newItems.objectives.length },
     { id: 'tasks', label: <CheckSquare className="h-4 w-4" />, count: newItems.tasks.length },
     { id: 'maintenance', label: <Wrench className="h-4 w-4" />, count: newItems.maintenance.length }
   ]
-
-  const renderTag = (tag: { name: string, color: string }) => {
-    // Convert hex color to RGB for contrast calculation
-    const hex = tag.color.replace('#', '')
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
-    
-    // Calculate relative luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    
-    // Use white text for dark backgrounds, black for light
-    const textColor = luminance > 0.5 ? 'text-gray-900' : 'text-white'
-    
-    return (
-      <Badge 
-        key={tag.name} 
-        variant="secondary"
-        style={{ 
-          backgroundColor: tag.color,
-          borderColor: luminance > 0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
-        }}
-        className={textColor}
-      >
-        <Tag className="w-3 h-3 mr-1" />
-        {tag.name}
-      </Badge>
-    )
-  }
 
   const renderObjective = (objective: NewItem) => {
     console.log('Rendering objective:', {

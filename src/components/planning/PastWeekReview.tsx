@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,7 +77,7 @@ export function PastWeekReview() {
     return a.localeCompare(b)
   })
 
-  const refreshTasks = async () => {
+  const refreshTasks = useCallback(async () => {
     try {
       setError(null)
       const weekStartDate = new Date()
@@ -111,11 +111,11 @@ export function PastWeekReview() {
         description: message
       })
     }
-  }
+  }, [updatePhaseData, toast])
 
   useEffect(() => {
     refreshTasks()
-  }, [updatePhaseData, refreshTasks])
+  }, [refreshTasks])
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
