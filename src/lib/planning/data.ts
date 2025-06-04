@@ -132,7 +132,7 @@ export async function getPastWeekTasks(teamId: string): Promise<PastWeekTasks> {
     urgency: task.urgency,
     created_at: task.created_at,
     updated_at: task.updated_at,
-    assignee: task.users || { full_name: 'Unassigned' },
+    assignee: task.users ? { full_name: task.users.full_name || 'Unassigned' } : { full_name: 'Unassigned' },
     tags: task.task_tags?.map(tt => tt.tags) || []
   }))
 
