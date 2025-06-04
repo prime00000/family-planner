@@ -338,7 +338,7 @@ export default function NewItemsReview() {
               tags: (task.task_tags || []).map(tt => ({
                 id: tt.tags.id,
                 name: tt.tags.name,
-                color: tt.tags.color || null
+                color: tt.tags.color || undefined
               }))
             })
             
@@ -354,7 +354,7 @@ export default function NewItemsReview() {
               tags: (task.task_tags || []).map(tt => ({
                 id: tt.tags.id,
                 name: tt.tags.name,
-                color: tt.tags.color || null
+                color: tt.tags.color || undefined
               }))
             }
           }),
@@ -376,7 +376,7 @@ export default function NewItemsReview() {
               tags: (item.maintenance_tags || []).map(mt => ({
                 id: mt.tags.id,
                 name: mt.tags.name,
-                color: mt.tags.color || null
+                color: mt.tags.color || undefined
               }))
             }
           })
