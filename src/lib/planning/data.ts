@@ -22,8 +22,8 @@ interface DatabaseTask {
   status: string | null
   importance: number | null
   urgency: number | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
   users: {
     full_name: string
   } | null
