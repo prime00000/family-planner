@@ -25,7 +25,7 @@ interface DatabaseTask {
   created_at: string | null
   updated_at: string | null
   users: {
-    full_name: string
+    full_name: string | null
   } | null
   task_tags: Array<{
     tags: {
