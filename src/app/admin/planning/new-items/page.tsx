@@ -35,8 +35,9 @@ interface NewItem {
     id: string
     name: string
     category: string
+    color?: string
   }>
-  frequency?: string
+  frequency?: string | null
   objective_id?: string | null
   objective_description?: string | null
 }
@@ -50,15 +51,15 @@ interface NewItemsData {
 interface TaskData {
   id: string;
   description: string;
-  importance: string;
-  urgency: string;
+  importance: number | null;
+  urgency: number | null;
   objective_id: string | null;
   objectives: { 
     id: string; 
     description: string; 
   } | null;
-  created_at: string;
-  users: { full_name: string };
+  created_at: string | null;
+  users: { full_name: string | null };
   task_tags: {
     tags: {
       id: string;
@@ -129,8 +130,15 @@ const RelatedObjectives = ({ description }: { description?: string }) => {
   )
 }
 
-// Fix the ItemTags component to use className instead of style
-const ItemTags = ({ tags }: { tags?: Array<{ name: string, color: string }> }) => {
+// Fix the ItemTags component to handle both tag types
+const ItemTags = ({ tags }: { 
+  tags?: Array<{ 
+    id: string; 
+    name: string; 
+    category: string; 
+    color?: string; 
+  }> 
+}) => {
   if (!tags?.length) return null
   
   return (
@@ -138,12 +146,13 @@ const ItemTags = ({ tags }: { tags?: Array<{ name: string, color: string }> }) =
       <Tag className="h-4 w-4 flex-shrink-0 mt-0.5 text-gray-500" />
       <div className="flex flex-wrap gap-1">
         {tags.map(tag => {
-          const luminance = getContrastColor(tag.color) === '#FFFFFF'
+          const color = tag.color || '#6B7280' // Default gray color if not specified
+          const luminance = getContrastColor(color) === '#FFFFFF'
           return (
             <Badge
-              key={tag.name}
+              key={tag.id}
               variant={luminance ? 'default' : 'secondary'}
-              className={`text-xs ${luminance ? 'bg-opacity-90' : ''} [background-color:${tag.color}] [color:${getContrastColor(tag.color)}]`}
+              className={`text-xs ${luminance ? 'bg-opacity-90' : ''} [background-color:${color}] [color:${getContrastColor(color)}]`}
             >
               {tag.name}
             </Badge>
@@ -336,14 +345,15 @@ export default function NewItemsReview() {
               created_at: obj.created_at
             }
           }),
-          tasks: (tasks || []).map((task: TaskData) => {
-            const importance = task.importance ? parseInt(String(task.importance), 10) : null
-            const urgency = task.urgency ? parseInt(String(task.urgency), 10) : null
+          tasks: (tasks || []).map((task) => {
+            const importance = task.importance
+            const urgency = task.urgency
             
             console.log('Transforming task:', {
               ...task,
               importance,
               urgency,
+              objective_id: task.objective_id,
               objectives: task.objectives
             })
             
@@ -363,21 +373,8 @@ export default function NewItemsReview() {
               }))
             }
           }),
-          maintenance: maintenance.map((item: {
-            id: string;
-            description: string;
-            importance: string | number | null;
-            frequency: string;
-            created_at: string | null;
-            users: { full_name: string | null } | null;
-            maintenance_tags: Array<{
-              tags: {
-                name: string;
-                color: string;
-              }
-            }> | null;
-          }) => {
-            const importance = item.importance ? parseInt(String(item.importance), 10) : null
+          maintenance: maintenance.map((item) => {
+            const importance = item.importance
             
             console.log('Transforming maintenance item:', {
               ...item,
@@ -391,10 +388,12 @@ export default function NewItemsReview() {
               frequency: item.frequency,
               submitted_by: item.users?.full_name || 'Unknown',
               created_at: item.created_at,
-              tags: item.maintenance_tags?.map(mt => ({
+              tags: (item.maintenance_tags || []).map(mt => ({
+                id: mt.tags.id,
                 name: mt.tags.name,
-                color: mt.tags.color
-              })) || []
+                category: 'maintenance',
+                color: mt.tags.color || null
+              }))
             }
           })
         }

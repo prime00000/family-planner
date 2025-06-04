@@ -412,11 +412,14 @@ export type Database = {
       }
       tasks: {
         Row: {
+          assignee_id: string | null
           big_task_id: string | null
           created_at: string | null
+          day_of_week: number | null
           description: string
           id: string
           importance: number | null
+          objective_id: string | null
           status: string | null
           submitted_by: string
           team_id: string
@@ -424,11 +427,14 @@ export type Database = {
           urgency: number | null
         }
         Insert: {
+          assignee_id?: string | null
           big_task_id?: string | null
           created_at?: string | null
+          day_of_week?: number | null
           description: string
           id?: string
           importance?: number | null
+          objective_id?: string | null
           status?: string | null
           submitted_by: string
           team_id: string
@@ -436,11 +442,14 @@ export type Database = {
           urgency?: number | null
         }
         Update: {
+          assignee_id?: string | null
           big_task_id?: string | null
           created_at?: string | null
+          day_of_week?: number | null
           description?: string
           id?: string
           importance?: number | null
+          objective_id?: string | null
           status?: string | null
           submitted_by?: string
           team_id?: string
@@ -449,10 +458,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_big_task_id_fkey"
             columns: ["big_task_id"]
             isOneToOne: false
             referencedRelation: "big_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
             referencedColumns: ["id"]
           },
           {
