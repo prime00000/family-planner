@@ -127,7 +127,7 @@ export async function getPastWeekTasks(teamId: string): Promise<PastWeekTasks> {
   const transformedTasks = (tasks || []).map((task: DatabaseTask): PlanningTask => ({
     id: task.id,
     description: task.description,
-    status: task.status,
+    status: task.status || 'pending',
     importance: task.importance,
     urgency: task.urgency,
     created_at: task.created_at,
