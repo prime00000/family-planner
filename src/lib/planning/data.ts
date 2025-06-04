@@ -6,8 +6,8 @@ export interface PlanningTask {
   status: string
   importance: number | null
   urgency: number | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
   assignee: {
     full_name: string
   }
