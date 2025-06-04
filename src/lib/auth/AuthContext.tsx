@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAILS = ['kurt@classyllama.com', 'kj.theobald@gmail.com'] // In production, this should come from env vars
 
-function isAdminUser(user: User | null): boolean {
-  if (!user?.email) return false
-  return ADMIN_EMAILS.some(email => email.toLowerCase() === user.email.toLowerCase())
+const isAdmin = (user: User | null): boolean => {
+  if (!user || !user.email) return false
+  return ADMIN_EMAILS.some(email => email.toLowerCase() === user.email!.toLowerCase())
 }
 
 interface AuthContextType {
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      setIsAdmin(isAdminUser(currentUser))
+      setIsAdmin(isAdmin(currentUser))
       setIsLoading(false)
     })
 
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      setIsAdmin(isAdminUser(currentUser))
+      setIsAdmin(isAdmin(currentUser))
       setIsLoading(false)
     })
 
