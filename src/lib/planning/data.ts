@@ -19,7 +19,7 @@ export interface PlanningTask {
 interface DatabaseTask {
   id: string
   description: string
-  status: string
+  status: string | null
   importance: number | null
   urgency: number | null
   created_at: string
