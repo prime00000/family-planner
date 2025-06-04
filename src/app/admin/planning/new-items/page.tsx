@@ -48,27 +48,6 @@ interface NewItemsData {
   maintenance: NewItem[]
 }
 
-interface TaskData {
-  id: string;
-  description: string;
-  importance: number | null;
-  urgency: number | null;
-  objective_id: string | null;
-  objectives: { 
-    id: string; 
-    description: string; 
-  } | null;
-  created_at: string | null;
-  users: { full_name: string | null };
-  task_tags: {
-    tags: {
-      id: string;
-      name: string;
-      category: string;
-    }
-  }[];
-}
-
 // Fix the importance/urgency icon components
 const ImportanceIcon = ({ level }: { level: number | undefined | null }) => {
   console.log('ImportanceIcon received level:', level, typeof level)
