@@ -288,6 +288,7 @@ export default function NewItemsReview() {
             users!submitted_by ( full_name ),
             maintenance_tags ( 
               tags ( 
+                id,
                 name,
                 color
               ) 
