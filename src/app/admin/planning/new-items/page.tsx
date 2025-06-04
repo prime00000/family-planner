@@ -34,7 +34,6 @@ interface NewItem {
   tags?: Array<{
     id: string
     name: string
-    category: string
     color?: string
   }>
   frequency?: string | null
@@ -114,7 +113,6 @@ const ItemTags = ({ tags }: {
   tags?: Array<{ 
     id: string; 
     name: string; 
-    category: string; 
     color?: string; 
   }> 
 }) => {
@@ -267,7 +265,7 @@ export default function NewItemsReview() {
               tags ( 
                 id, 
                 name,
-                category 
+                color
               ) 
             )
           `)
@@ -333,7 +331,14 @@ export default function NewItemsReview() {
               importance,
               urgency,
               objective_id: task.objective_id,
-              objectives: task.objectives
+              objective_description: task.objectives?.description || null,
+              submitted_by: task.users?.full_name || 'Unknown',
+              created_at: task.created_at,
+              tags: (task.task_tags || []).map(tt => ({
+                id: tt.tags.id,
+                name: tt.tags.name,
+                color: tt.tags.color || null
+              }))
             })
             
             return {
@@ -348,7 +353,7 @@ export default function NewItemsReview() {
               tags: (task.task_tags || []).map(tt => ({
                 id: tt.tags.id,
                 name: tt.tags.name,
-                category: tt.tags.category
+                color: tt.tags.color || null
               }))
             }
           }),
@@ -370,7 +375,6 @@ export default function NewItemsReview() {
               tags: (item.maintenance_tags || []).map(mt => ({
                 id: mt.tags.id,
                 name: mt.tags.name,
-                category: 'maintenance',
                 color: mt.tags.color || null
               }))
             }
