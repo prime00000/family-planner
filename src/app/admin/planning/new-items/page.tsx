@@ -482,7 +482,7 @@ export default function NewItemsReview() {
             {objective.importance !== null && objective.importance > 0 && (
               <ImportanceIcon level={objective.importance} />
             )}
-            {objective.urgency !== null && objective.urgency > 0 && (
+            {objective.urgency !== null && objective.urgency !== undefined && objective.urgency > 0 && (
               <UrgencyIcon level={objective.urgency} />
             )}
           </div>
@@ -523,7 +523,7 @@ export default function NewItemsReview() {
             {task.importance !== null && task.importance > 0 && (
               <ImportanceIcon level={task.importance} />
             )}
-            {task.urgency !== null && task.urgency > 0 && (
+            {task.urgency !== null && task.urgency !== undefined && task.urgency > 0 && (
               <UrgencyIcon level={task.urgency} />
             )}
           </div>
