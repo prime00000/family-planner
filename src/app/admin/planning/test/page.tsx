@@ -32,7 +32,10 @@ interface TasksData {
   success?: boolean
   cleared_plans?: number
   archived_tasks?: boolean
-  current_state?: unknown
+  current_state?: {
+    task_status_summary?: Record<string, number>
+    [key: string]: unknown
+  }
 }
 
 interface RebuildResult {
