@@ -202,8 +202,8 @@ export default function TestPage() {
               <div className="space-y-2 text-sm">
                 <p>Plan: {rebuildResult.plan.title} ({rebuildResult.plan.status})</p>
                 <p>Plan Tasks in DB: {rebuildResult.plan_tasks_count}</p>
-                <p>Tasks in AI Conversation: {rebuildResult.ai_conversation.ai_task_count}</p>
-                {rebuildResult.ai_conversation.assignment_keys.length > 0 && (
+                <p>Tasks in AI Conversation: {rebuildResult.ai_conversation?.ai_task_count || 0}</p>
+                {rebuildResult.ai_conversation && rebuildResult.ai_conversation.assignment_keys.length > 0 && (
                   <p>Assigned to: {rebuildResult.ai_conversation.assignment_keys.length} users</p>
                 )}
               </div>
