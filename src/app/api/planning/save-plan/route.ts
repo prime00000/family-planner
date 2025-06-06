@@ -42,54 +42,37 @@ export async function POST(request: NextRequest) {
     let tasksCreated = 0
     let weeklyPlan: any
 
-    // Create a mapping of user names to user IDs
-    const { data: teamMembers, error: teamError } = await supabase
-      .from('team_members')
-      .select('user_id, display_name, users!inner(full_name, email)')
-      .eq('team_id', TEAM_ID)
-
-    if (teamError || !teamMembers) {
-      throw new Error(`Failed to fetch team members: ${teamError?.message}`)
+    // Validate that assignment keys are UUIDs (AI should now use UUIDs directly)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const assignmentKeys = Object.keys(plan.assignments)
+    const invalidKeys = assignmentKeys.filter(key => !uuidRegex.test(key))
+    
+    if (invalidKeys.length > 0) {
+      console.error('Plan contains non-UUID assignment keys:', invalidKeys)
+      throw new Error(`Invalid assignment keys (must be UUIDs): ${invalidKeys.join(', ')}`)
     }
 
-    const userNameToId: Record<string, string> = {}
-    teamMembers.forEach(member => {
-      const { user_id, display_name, users } = member
-      if (!user_id || !users) return
+    // Verify all assignment keys exist in team_members
+    const { data: teamMembers, error: teamError } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', TEAM_ID)
 
-      const fullName = users.full_name
-      const email = users.email
+    if (teamError) {
+      throw new Error(`Failed to verify team members: ${teamError.message}`)
+    }
 
-      // Helper function to add mapping variations
-      const addMapping = (name: string) => {
-        if (name) {
-          userNameToId[name.toLowerCase()] = user_id
-          userNameToId[name] = user_id
-        }
-      }
+    const validUserIds = new Set(teamMembers?.map(m => m.user_id) || [])
+    const invalidUserIds = assignmentKeys.filter(key => !validUserIds.has(key))
+    
+    if (invalidUserIds.length > 0) {
+      console.error('Plan contains invalid user IDs:', invalidUserIds)
+      console.error('Valid team member IDs:', Array.from(validUserIds))
+      console.error('Assignment keys from plan:', assignmentKeys)
+      throw new Error(`Invalid user IDs in assignments: ${invalidUserIds.join(', ')}`)
+    }
 
-      // Map display_name (priority 1)
-      if (display_name) {
-        addMapping(display_name)
-        // Also map first name from display_name
-        const firstNameFromDisplay = display_name.split(' ')[0]
-        addMapping(firstNameFromDisplay)
-      }
-
-      // Map full_name (priority 2)
-      if (fullName) {
-        addMapping(fullName)
-        // Also map first name from full_name
-        const firstNameFromFull = fullName.split(' ')[0]
-        addMapping(firstNameFromFull)
-      }
-
-      // Map email username as fallback (priority 3)
-      if (email) {
-        const emailUsername = email.split('@')[0]
-        addMapping(emailUsername)
-      }
-    })
+    console.log('All assignment keys validated as valid UUIDs and team member IDs')
 
     // 1. Create or update the weekly plan record
     if (planId) {
@@ -153,25 +136,28 @@ export async function POST(request: NextRequest) {
 
     // 2. Create plan_tasks from the AI plan (no archiving/backlog for draft plans)
 
+    console.log('Creating plan_tasks for plan:', weeklyPlan.id)
+    console.log('Plan assignments with UUIDs:', Object.keys(plan.assignments))
+
     const planTasksToInsert: Database['public']['Tables']['plan_tasks']['Insert'][] = []
 
-    for (const [userName, assignments] of Object.entries(plan.assignments)) {
-      // Look up the user ID from the user name
-      const assigneeId = userNameToId[userName] || userNameToId[userName.toLowerCase()]
+    for (const [userId, assignments] of Object.entries(plan.assignments)) {
+      console.log(`Processing assignments for user ID: ${userId}`)
       
-      if (!assigneeId) {
-        console.warn(`Could not find user ID for: ${userName}`)
-        continue
-      }
+      // userId is already a UUID from the AI response
+      const assigneeId = userId
+
+      console.log(`Using UUID directly: ${assigneeId}`)
 
       // Process each day's tasks
       for (const [day, tasks] of Object.entries(assignments)) {
         if (day === 'user_name' || !Array.isArray(tasks)) continue
 
+        console.log(`Processing day ${day} with ${tasks.length} tasks`)
         const dayOfWeek = getDayOfWeekNumber(day)
 
         for (const task of tasks) {
-          planTasksToInsert.push({
+          const planTask = {
             weekly_plan_id: weeklyPlan.id,
             assignee_id: assigneeId,
             description: task.description,
@@ -179,10 +165,15 @@ export async function POST(request: NextRequest) {
             status: 'pending',
             importance: task.importance,
             urgency: task.urgency
-          })
+          }
+          
+          console.log('Adding plan task:', planTask)
+          planTasksToInsert.push(planTask)
         }
       }
     }
+
+    console.log(`Total plan_tasks to insert: ${planTasksToInsert.length}`)
 
     if (planTasksToInsert.length > 0) {
       const { error: createError } = await supabase
@@ -190,10 +181,14 @@ export async function POST(request: NextRequest) {
         .insert(planTasksToInsert)
 
       if (createError) {
+        console.error('Error creating plan tasks:', createError)
         throw new Error(`Failed to create plan tasks: ${createError.message}`)
       }
 
+      console.log(`Successfully created ${planTasksToInsert.length} plan tasks`)
       tasksCreated = planTasksToInsert.length
+    } else {
+      console.log('No plan tasks to create - plan assignments may be empty')
     }
 
     // Return save summary

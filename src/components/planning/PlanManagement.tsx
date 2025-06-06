@@ -56,38 +56,50 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
   }, [])
 
   const loadPlans = async () => {
+    console.log('Loading plans via API...')
     try {
-      const { data, error } = await supabase
-        .from('weekly_plans')
-        .select(`
-          id,
-          title,
-          status,
-          created_at,
-          scheduled_activation,
-          week_start_date,
-          created_by,
-          plan_tasks(count)
-        `)
-        .eq('team_id', TEAM_ID)
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/planning/list-plans')
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('API error response:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch plans')
+      }
 
-      if (error) throw error
+      const data = await response.json()
+      console.log('Plans loaded successfully:', data.plans?.length || 0, 'plans')
 
-      const formattedPlans = data?.map(plan => ({
-        id: plan.id,
-        title: plan.title || 'Untitled Plan',
-        status: plan.status as 'draft' | 'active' | 'completed',
-        created_at: plan.created_at,
-        scheduled_activation: plan.scheduled_activation,
-        week_start_date: plan.week_start_date,
-        plan_tasks_count: plan.plan_tasks?.[0]?.count || 0,
-        created_by: plan.created_by
-      })) || []
+      if (data.success) {
+        if (data.plans && Array.isArray(data.plans)) {
+          console.log('Processing plans array:', data.plans)
+          
+          const formattedPlans = data.plans.map((plan: any, index: number) => {
+            console.log(`Plan ${index + 1}: "${plan.title}" (${plan.plan_tasks_count} tasks)`)
+            
+            return {
+              id: plan.id,
+              title: plan.title || 'Untitled Plan',
+              status: plan.status as 'draft' | 'active' | 'completed',
+              created_at: plan.created_at,
+              scheduled_activation: plan.scheduled_activation,
+              week_start_date: plan.week_start_date,
+              plan_tasks_count: plan.plan_tasks_count || 0,
+              created_by: plan.created_by
+            }
+          })
 
-      setPlans(formattedPlans)
+          setPlans(formattedPlans)
+        } else {
+          console.log('No plans array in response')
+          setPlans([])
+        }
+      } else {
+        console.log('API response not successful')
+        setPlans([])
+      }
     } catch (error) {
       console.error('Error loading plans:', error)
+      setPlans([])
     } finally {
       setIsLoading(false)
     }
@@ -220,17 +232,21 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
         </Card>
       ) : (
         <div className="space-y-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-3">
-                    {getStatusIcon(plan.status)}
-                    <h3 className="text-lg font-medium text-gray-900 truncate">
-                      {plan.title}
-                    </h3>
-                    {getStatusBadge(plan.status)}
-                  </div>
+          {plans.map((plan) => {
+            console.log('Rendering plan:', plan.id, 'Title:', plan.title)
+            return (
+              <Card key={plan.id} className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                      {getStatusIcon(plan.status)}
+                      <h3 className="text-lg font-medium text-gray-900 flex-1 min-w-0">
+                        {plan.title}
+                      </h3>
+                      <div className="flex-shrink-0">
+                        {getStatusBadge(plan.status)}
+                      </div>
+                    </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
@@ -259,7 +275,7 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex flex-col gap-2 ml-4 flex-shrink-0">
                   {plan.status === 'draft' && (
                     <>
                       <Button
@@ -267,6 +283,7 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
                         variant="outline"
                         size="sm"
                         disabled={actionLoading === plan.id}
+                        className="w-20"
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -275,7 +292,7 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
                       <Button
                         onClick={() => handleActivate(plan)}
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 w-20"
                         disabled={actionLoading === plan.id}
                       >
                         <Play className="h-4 w-4 mr-1" />
@@ -289,7 +306,7 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
                       onClick={() => handleDelete(plan)}
                       variant="outline"
                       size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 w-20"
                       disabled={actionLoading === plan.id}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
@@ -299,7 +316,8 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
                 </div>
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
 
