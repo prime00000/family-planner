@@ -28,6 +28,8 @@ export default function Phase3PlanningPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [showDeployDialog, setShowDeployDialog] = useState(false)
+  const [planTitle, setPlanTitle] = useState('')
+  const [scheduledDate, setScheduledDate] = useState<string | null>(null)
   
   // Redirect if not admin
   useEffect(() => {
@@ -113,6 +115,10 @@ export default function Phase3PlanningPage() {
       
       setCurrentPlan(plan)
       setPlanVersion(1)
+      // Set the AI's suggested title
+      if (plan.title) {
+        setPlanTitle(plan.title)
+      }
     } catch (error) {
       console.error('Error generating plan:', error)
       // TODO: Show error toast
@@ -136,6 +142,10 @@ export default function Phase3PlanningPage() {
       
       setCurrentPlan(result.updatedPlan)
       setPlanVersion(v => v + 1)
+      // Update title if AI provides a new one
+      if (result.updatedPlan.title) {
+        setPlanTitle(result.updatedPlan.title)
+      }
       setConversation([...conversation, {
         userMessage: feedback,
         aiResponse: result.explanation,
@@ -150,7 +160,7 @@ export default function Phase3PlanningPage() {
     }
   }
 
-  const handleDeploy = async () => {
+  const handleSave = async () => {
     if (!currentPlan) return
     setShowDeployDialog(true)
   }
@@ -198,7 +208,7 @@ export default function Phase3PlanningPage() {
           selectedTaskIds={selectedTaskIds}
           onSelectionChange={setSelectedTaskIds}
           onRefinement={handleRefinement}
-          onApprove={handleDeploy}
+          onApprove={handleSave}
           onStartOver={handleStartOver}
           isProcessing={isProcessing}
           conversation={conversation}
@@ -207,6 +217,10 @@ export default function Phase3PlanningPage() {
         {showDeployDialog && (
           <DeployDialog
             plan={currentPlan}
+            title={planTitle}
+            onTitleChange={setPlanTitle}
+            scheduledDate={scheduledDate}
+            onScheduledDateChange={setScheduledDate}
             onClose={() => setShowDeployDialog(false)}
             onDeploy={async () => {
               if (!user) {
@@ -214,11 +228,18 @@ export default function Phase3PlanningPage() {
                 return
               }
               
+              if (!planTitle.trim()) {
+                console.error('Plan title is required')
+                // TODO: Show error toast
+                return
+              }
+              
               try {
                 const result = await savePlan({
-                  plan: currentPlan,
+                  plan: { ...currentPlan, title: planTitle },
                   conversationHistory: conversation,
-                  userId: user.id
+                  userId: user.id,
+                  scheduledActivation: scheduledDate
                 })
                 
                 if (result.success) {
@@ -226,7 +247,7 @@ export default function Phase3PlanningPage() {
                   router.push('/admin/planning')
                 }
               } catch (error) {
-                console.error('Error deploying plan:', error)
+                console.error('Error saving plan:', error)
                 // TODO: Show error toast
               }
             }}

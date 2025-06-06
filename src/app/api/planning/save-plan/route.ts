@@ -13,6 +13,7 @@ interface SavePlanRequest {
   plan: VibePlanFile
   conversationHistory: ConversationExchange[]
   userId: string
+  scheduledActivation?: string | null
 }
 
 // Removed getWeekStartDate function - no longer needed for draft plans
@@ -34,7 +35,7 @@ function getDayOfWeekNumber(day: string): number | null {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as SavePlanRequest
-    const { plan, conversationHistory, userId } = body
+    const { plan, conversationHistory, userId, scheduledActivation } = body
 
     // Start saving the plan as draft
     let tasksCreated = 0
@@ -93,9 +94,11 @@ export async function POST(request: NextRequest) {
       .from('weekly_plans')
       .insert({
         team_id: TEAM_ID,
-        week_start_date: null, // Will be set when plan is scheduled
+        week_start_date: null, // Will be set when plan is activated
         created_by: userId,
         status: 'draft',
+        title: plan.title || 'Weekly Plan',
+        scheduled_activation: scheduledActivation || null,
         ai_conversation: {
           exchanges: conversationHistory,
           finalPlan: plan

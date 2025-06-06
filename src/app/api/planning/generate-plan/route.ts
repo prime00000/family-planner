@@ -96,6 +96,7 @@ Create a balanced weekly plan. For each person, assign tasks to specific days (M
 
 Return a JSON object with this EXACT structure:
 {
+  "title": "Suggested plan title that captures the week's theme or main focus",
   "assignments": {
     "[userId]": {
       "user_name": "Name",

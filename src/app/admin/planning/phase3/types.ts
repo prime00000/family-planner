@@ -18,6 +18,7 @@ export interface TaskAssignment {
 }
 
 export interface VibePlanFile {
+  title?: string
   assignments: {
     [userId: string]: {
       user_name: string

@@ -80,6 +80,7 @@ export async function savePlan(params: {
   plan: VibePlanFile
   conversationHistory: ConversationExchange[]
   userId: string
+  scheduledActivation?: string | null
 }): Promise<{
   success: boolean
   weeklyPlanId: string
