@@ -81,6 +81,7 @@ export async function savePlan(params: {
   conversationHistory: ConversationExchange[]
   userId: string
   scheduledActivation?: string | null
+  planId?: string | null
 }): Promise<{
   success: boolean
   weeklyPlanId: string

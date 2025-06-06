@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { usePlanningStore } from '@/stores/planningStore'
 import { PastWeekReview } from '@/components/planning/PastWeekReview'
+import { DraftPlansList } from '@/components/planning/DraftPlansList'
 import NewItemsReview from '@/app/admin/planning/new-items/page'
 import { Button } from '@/components/ui/button'
 import { ChevronRight } from 'lucide-react'
@@ -125,16 +126,19 @@ export default function AdminPlanningPage() {
 
             {phase === PLANNING_PHASES.VIBE_PLAN && (
               <div className="px-3 py-4 sm:px-4">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Plan Week
-                </h2>
-                <p className="text-gray-500 mb-4">AI-powered weekly planning</p>
-                <Button
-                  onClick={() => router.push('/admin/planning/phase3')}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                >
-                  Start Planning
-                </Button>
+                <DraftPlansList onEditPlan={(planId) => router.push(`/admin/planning/phase3?edit=${planId}`)} />
+                <div className="mt-6 pt-6 border-t">
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                    Create New Plan
+                  </h2>
+                  <p className="text-gray-500 mb-4">AI-powered weekly planning</p>
+                  <Button
+                    onClick={() => router.push('/admin/planning/phase3')}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                  >
+                    Start Planning
+                  </Button>
+                </div>
               </div>
             )}
           </div>

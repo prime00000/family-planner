@@ -14,6 +14,7 @@ interface SavePlanRequest {
   conversationHistory: ConversationExchange[]
   userId: string
   scheduledActivation?: string | null
+  planId?: string | null // For updating existing plans
 }
 
 // Removed getWeekStartDate function - no longer needed for draft plans
@@ -35,10 +36,11 @@ function getDayOfWeekNumber(day: string): number | null {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as SavePlanRequest
-    const { plan, conversationHistory, userId, scheduledActivation } = body
+    const { plan, conversationHistory, userId, scheduledActivation, planId } = body
 
     // Start saving the plan as draft
     let tasksCreated = 0
+    let weeklyPlan: any
 
     // Create a mapping of user names to user IDs
     const { data: teamMembers, error: teamError } = await supabase
@@ -89,26 +91,64 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // 1. Create the weekly plan record with NULL week_start_date for drafts
-    const { data: weeklyPlan, error: planError } = await supabase
-      .from('weekly_plans')
-      .insert({
-        team_id: TEAM_ID,
-        week_start_date: null, // Will be set when plan is activated
-        created_by: userId,
-        status: 'draft',
-        title: plan.title || 'Weekly Plan',
-        scheduled_activation: scheduledActivation || null,
-        ai_conversation: {
-          exchanges: conversationHistory,
-          finalPlan: plan
-        }
-      })
-      .select()
-      .single()
+    // 1. Create or update the weekly plan record
+    if (planId) {
+      // Update existing plan
+      const { data: updatedPlan, error: updateError } = await supabase
+        .from('weekly_plans')
+        .update({
+          title: plan.title || 'Weekly Plan',
+          scheduled_activation: scheduledActivation || null,
+          ai_conversation: {
+            exchanges: conversationHistory,
+            finalPlan: plan
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', planId)
+        .eq('team_id', TEAM_ID)
+        .select()
+        .single()
 
-    if (planError || !weeklyPlan) {
-      throw new Error(`Failed to create weekly plan: ${planError?.message}`)
+      if (updateError || !updatedPlan) {
+        throw new Error(`Failed to update weekly plan: ${updateError?.message}`)
+      }
+      
+      weeklyPlan = updatedPlan
+
+      // Delete existing plan_tasks for this plan
+      const { error: deleteError } = await supabase
+        .from('plan_tasks')
+        .delete()
+        .eq('weekly_plan_id', planId)
+
+      if (deleteError) {
+        throw new Error(`Failed to delete existing plan tasks: ${deleteError.message}`)
+      }
+    } else {
+      // Create new plan
+      const { data: newPlan, error: planError } = await supabase
+        .from('weekly_plans')
+        .insert({
+          team_id: TEAM_ID,
+          week_start_date: null, // Will be set when plan is activated
+          created_by: userId,
+          status: 'draft',
+          title: plan.title || 'Weekly Plan',
+          scheduled_activation: scheduledActivation || null,
+          ai_conversation: {
+            exchanges: conversationHistory,
+            finalPlan: plan
+          }
+        })
+        .select()
+        .single()
+
+      if (planError || !newPlan) {
+        throw new Error(`Failed to create weekly plan: ${planError?.message}`)
+      }
+      
+      weeklyPlan = newPlan
     }
 
     // 2. Create plan_tasks from the AI plan (no archiving/backlog for draft plans)

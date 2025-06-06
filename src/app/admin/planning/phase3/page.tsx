@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { usePlanningStore } from '@/stores/planningStore'
 import { PLANNING_PHASES, TEAM_ID } from '@/lib/constants'
@@ -12,11 +12,19 @@ import { DeployDialog } from './components/DeployDialog'
 import { generateInitialPlan, refinePlan, savePlan } from './lib/ai-service'
 import { supabase } from '@/lib/supabase'
 import type { VibePlanFile, ConversationExchange } from './types'
+import { Button } from '@/components/ui/button'
+import { AlertCircle } from 'lucide-react'
 
 export default function Phase3PlanningPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAdmin } = useAuth()
   const { phase, setPhase } = usePlanningStore()
+  
+  // Edit mode state
+  const [editPlanId, setEditPlanId] = useState<string | null>(null)
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false)
+  const [showEditWarning, setShowEditWarning] = useState(false)
   
   // Local state for Phase 3
   const [, setPriorityGuidance] = useState('')
@@ -44,6 +52,45 @@ export default function Phase3PlanningPage() {
       router.replace('/admin/planning')
     }
   }, [phase, router])
+
+  // Load plan if editing
+  useEffect(() => {
+    const planId = searchParams.get('edit')
+    if (planId && !editPlanId) {
+      setEditPlanId(planId)
+      loadPlanForEditing(planId)
+    }
+  }, [searchParams])
+
+  const loadPlanForEditing = async (planId: string) => {
+    setIsLoadingPlan(true)
+    try {
+      const response = await fetch(`/api/planning/load-plan?planId=${planId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load plan')
+      }
+
+      const data = await response.json()
+      const { plan } = data
+
+      // Set all the state from the loaded plan
+      setCurrentPlan(plan.vibePlan)
+      setConversation(plan.conversation || [])
+      setPlanTitle(plan.title || '')
+      setScheduledDate(plan.scheduledActivation || null)
+      setSkipPriority(true) // Skip priority prompt when editing
+      setPlanVersion((plan.conversation?.length || 0) + 1)
+      
+      // Show edit warning
+      setShowEditWarning(true)
+    } catch (error) {
+      console.error('Error loading plan:', error)
+      // TODO: Show error toast
+      router.push('/admin/planning')
+    } finally {
+      setIsLoadingPlan(false)
+    }
+  }
 
   const handlePrioritySubmit = async (guidance: string | null) => {
     setIsGenerating(true)
@@ -175,13 +222,48 @@ export default function Phase3PlanningPage() {
   }
 
   // Show loading state while checking auth
-  if (authLoading || phase !== PLANNING_PHASES.VIBE_PLAN) {
+  if (authLoading || phase !== PLANNING_PHASES.VIBE_PLAN || isLoadingPlan) {
     return <LoadingState />
   }
 
   // Don't render for non-admins
   if (!isAdmin) {
     return <LoadingState />
+  }
+
+  // Show edit warning if editing an existing plan
+  if (showEditWarning && editPlanId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h2 className="text-xl font-semibold mb-4">Editing Existing Plan</h2>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">Warning</p>
+                <p>Editing this plan will replace all existing tasks. This action cannot be undone.</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/admin/planning')}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => setShowEditWarning(false)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Continue Editing
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Show priority prompt if not skipped
@@ -239,7 +321,8 @@ export default function Phase3PlanningPage() {
                   plan: { ...currentPlan, title: planTitle },
                   conversationHistory: conversation,
                   userId: user.id,
-                  scheduledActivation: scheduledDate
+                  scheduledActivation: scheduledDate,
+                  planId: editPlanId // Pass planId if editing
                 })
                 
                 if (result.success) {
