@@ -8,7 +8,7 @@ import { PastWeekReview } from '@/components/planning/PastWeekReview'
 import { PlanManagement } from '@/components/planning/PlanManagement'
 import NewItemsReview from '@/app/admin/planning/new-items/page'
 import { Button } from '@/components/ui/button'
-import { ChevronRight, Plus, Settings } from 'lucide-react'
+import { ChevronRight, Plus, Settings, Home } from 'lucide-react'
 import { PLANNING_PHASES } from '@/lib/constants'
 
 const phases = [
@@ -72,12 +72,25 @@ export default function AdminPlanningPage() {
         <div className="bg-white shadow">
           {/* Header */}
           <div className="px-3 py-4 sm:px-4 border-b border-gray-200">
-            <h1 className="text-xl font-semibold text-gray-900">
-              Weekly Planning Session
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Review last week and plan the upcoming week
-            </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  Weekly Planning Session
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Review last week and plan the upcoming week
+                </p>
+              </div>
+              <Button
+                onClick={() => router.push('/')}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Home</span>
+              </Button>
+            </div>
           </div>
 
           {/* Phase Navigation */}
