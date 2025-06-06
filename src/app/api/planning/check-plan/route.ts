@@ -23,19 +23,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Get actual plan_tasks
-    const { data: planTasks, error: tasksError } = await supabase
+    const { data: planTasks } = await supabase
       .from('plan_tasks')
       .select('*')
       .eq('weekly_plan_id', planId)
 
     // Check AI conversation for tasks
-    const aiConversation = plan.ai_conversation as any
+    interface AiConversation {
+      finalPlan?: {
+        assignments?: Record<string, Record<string, unknown>>
+      }
+    }
+    const aiConversation = plan.ai_conversation as AiConversation
     const hasAiTasks = !!(aiConversation?.finalPlan?.assignments)
     const aiTaskCount = hasAiTasks ? 
-      Object.values(aiConversation.finalPlan.assignments).reduce((sum: number, user: any) => {
+      Object.values(aiConversation.finalPlan.assignments).reduce((sum: number, user: Record<string, unknown>) => {
         return sum + Object.values(user)
           .filter(v => Array.isArray(v))
-          .reduce((userSum: number, tasks: any) => userSum + tasks.length, 0)
+          .reduce((userSum: number, tasks: unknown[]) => userSum + (tasks as unknown[]).length, 0)
       }, 0) : 0
 
     return NextResponse.json({

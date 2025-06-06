@@ -8,10 +8,10 @@ const supabase = createClient<Database>(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get active tasks
-    const { data: activeTasks, error: activeError } = await supabase
+    const { data: activeTasks } = await supabase
       .from('tasks')
       .select('id, title, status, assignee_id, day_of_week, team_id, plan_task_id')
       .eq('team_id', TEAM_ID)
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }, {} as Record<string, number>)
 
     // Get recent tasks
-    const { data: recentTasks, error: recentError } = await supabase
+    const { data: recentTasks } = await supabase
       .from('tasks')
       .select('id, title, status, created_at, assignee_id, day_of_week')
       .eq('team_id', TEAM_ID)

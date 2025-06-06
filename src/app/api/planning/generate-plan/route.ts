@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
-import type { VibePlanFile, TaskAssignment } from '@/app/admin/planning/phase3/types'
+import type { VibePlanFile } from '@/app/admin/planning/phase3/types'
 import { TEAM_ID } from '@/lib/constants'
 
 const anthropic = new Anthropic({
@@ -50,14 +50,6 @@ interface GeneratePlanRequest {
   teamMembers: TeamMember[]
 }
 
-interface DatabaseTeamMember {
-  user_id: string
-  display_name: string | null
-  users: {
-    full_name: string | null
-    email: string
-  } | null
-}
 
 const FAMILY_CONTEXT = `
 You are planning tasks for the Theobald family:
@@ -87,7 +79,7 @@ function createTaskPrompt(params: GeneratePlanRequest & { teamMembersWithUUIDs: 
   const exampleName1 = teamMembersWithUUIDs[0]?.name || 'First User'
   const exampleName2 = teamMembersWithUUIDs[1]?.name || 'Second User'
   
-  let prompt = `You are a family task planning AI. Create a weekly task plan for the Theobald family.
+  const prompt = `You are a family task planning AI. Create a weekly task plan for the Theobald family.
 
 ${FAMILY_CONTEXT}
 
@@ -205,7 +197,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert database format to TeamMember format with UUIDs
-    const teamMembersWithUUIDs: TeamMember[] = teamMembersFromDB.map((member: any) => ({
+    interface DBMember {
+      user_id: string
+      display_name?: string | null
+      users?: {
+        full_name?: string | null
+        email?: string
+      } | null
+    }
+    const teamMembersWithUUIDs: TeamMember[] = teamMembersFromDB.map((member: DBMember) => ({
       id: member.user_id,
       name: member.display_name || member.users?.full_name || 'Unknown',
       email: member.users?.email || 'unknown@email.com'
@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
       }
 
       planData = JSON.parse(jsonMatch[1])
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse AI response:', content.text)
       throw new Error('Failed to parse AI response as JSON')
     }

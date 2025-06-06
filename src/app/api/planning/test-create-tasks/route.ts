@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     console.log(`Successfully created ${testTasks.length} test tasks for plan ${planId}`)
 
     // Verify they were created
-    const { data: verifyTasks, error: verifyError } = await supabase
+    const { data: verifyTasks } = await supabase
       .from('plan_tasks')
       .select('*')
       .eq('weekly_plan_id', planId)

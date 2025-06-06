@@ -8,7 +8,7 @@ const supabase = createClient<Database>(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('DEBUG: Checking team members for TEAM_ID:', TEAM_ID)
 

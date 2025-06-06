@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     // First, find active plans with the same week_start_date
     const weekStartDate = plan.week_start_date || getWeekStartDate()
     
-    const { data: activePlans, error: findError } = await supabase
+    const { data: activePlans } = await supabase
       .from('weekly_plans')
       .select('id')
       .eq('team_id', TEAM_ID)

@@ -60,7 +60,7 @@ function createRefinementPrompt(params: RefinePlanRequest): string {
     currentPlanDetails += '\n'
   }
   
-  let prompt = `You are refining a family task plan based on user feedback.
+  const prompt = `You are refining a family task plan based on user feedback.
 
 ${FAMILY_CONTEXT}
 
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       }
 
       refinementResult = JSON.parse(jsonMatch[1])
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse AI response:', content.text)
       throw new Error('Failed to parse AI response as JSON')
     }

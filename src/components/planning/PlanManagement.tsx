@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +14,6 @@ import {
   CheckCircle,
   Calendar as CalendarIcon
 } from 'lucide-react'
-import { TEAM_ID } from '@/lib/constants'
 
 interface Plan {
   id: string
@@ -73,9 +71,7 @@ export function PlanManagement({ onEditPlan, onCreateNew }: PlanManagementProps)
         if (data.plans && Array.isArray(data.plans)) {
           console.log('Processing plans array:', data.plans)
           
-          const formattedPlans = data.plans.map((plan: any, index: number) => {
-            console.log(`Plan ${index + 1}: "${plan.title}" (${plan.plan_tasks_count} tasks)`)
-            
+          const formattedPlans = data.plans.map((plan: Plan) => {
             return {
               id: plan.id,
               title: plan.title || 'Untitled Plan',

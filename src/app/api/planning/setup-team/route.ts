@@ -8,7 +8,7 @@ const supabase = createClient<Database>(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // First, let's get all users to see who we can add
     const { data: allUsers, error: usersError } = await supabase
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     console.log('Found team:', team.name)
 
     // Get existing team members to avoid duplicates
-    const { data: existingMembers, error: existingError } = await supabase
+    const { data: existingMembers } = await supabase
       .from('team_members')
       .select('user_id')
       .eq('team_id', TEAM_ID)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch final team member list
-    const { data: finalMembers, error: finalError } = await supabase
+    const { data: finalMembers } = await supabase
       .from('team_members')
       .select('user_id, display_name, role, users!inner(email, full_name)')
       .eq('team_id', TEAM_ID)

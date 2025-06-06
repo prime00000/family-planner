@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
-import { TEAM_ID } from '@/lib/constants'
 
 const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,7 +44,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract the final plan from ai_conversation
-    const aiConversation = plan.ai_conversation as any
+    interface AiConversation {
+      finalPlan?: {
+        assignments?: Record<string, Record<string, unknown>>
+      }
+    }
+    const aiConversation = plan.ai_conversation as AiConversation
     const finalPlan = aiConversation?.finalPlan
 
     if (!finalPlan || !finalPlan.assignments) {
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Process each day's tasks
-      for (const [day, tasks] of Object.entries(assignments as any)) {
+      for (const [day, tasks] of Object.entries(assignments as Record<string, unknown>)) {
         if (day === 'user_name' || !Array.isArray(tasks)) continue
 
         const dayOfWeek = getDayOfWeekNumber(day)

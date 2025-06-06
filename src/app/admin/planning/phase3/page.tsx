@@ -60,7 +60,7 @@ export default function Phase3PlanningPage() {
       setEditPlanId(planId)
       loadPlanForEditing(planId)
     }
-  }, [searchParams])
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPlanForEditing = async (planId: string) => {
     setIsLoadingPlan(true)

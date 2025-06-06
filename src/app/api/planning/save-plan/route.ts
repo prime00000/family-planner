@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Start saving the plan as draft
     let tasksCreated = 0
-    let weeklyPlan: any
+    let weeklyPlan: Database['public']['Tables']['weekly_plans']['Row']
 
     // Validate that assignment keys are UUIDs (AI should now use UUIDs directly)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

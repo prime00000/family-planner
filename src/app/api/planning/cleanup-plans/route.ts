@@ -8,10 +8,10 @@ const supabase = createClient<Database>(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // 1. Find all plans with week_start_date set
-    const { data: plansWithDates, error: plansError } = await supabase
+    const { data: plansWithDates } = await supabase
       .from('weekly_plans')
       .select('id, title, status, week_start_date')
       .eq('team_id', TEAM_ID)
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     console.log('Plans with dates:', plansWithDates)
 
     // 2. Clear week_start_date from non-active plans
-    const { data: clearedPlans, error: clearError } = await supabase
+    const { data: clearedPlans } = await supabase
       .from('weekly_plans')
       .update({ week_start_date: null })
       .eq('team_id', TEAM_ID)
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (!activePlans || activePlans.length === 0) {
       console.log('No active plans found, archiving all pending tasks')
       
-      const { data: archivedTasks, error: archiveError } = await supabase
+      const { data: archivedTasks } = await supabase
         .from('tasks')
         .update({ status: 'backlog' })
         .eq('team_id', TEAM_ID)

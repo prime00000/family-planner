@@ -1,4 +1,4 @@
-import type { VibePlanFile, TaskAssignment, ConversationExchange } from '../types'
+import type { VibePlanFile, ConversationExchange } from '../types'
 
 interface Task {
   id: string

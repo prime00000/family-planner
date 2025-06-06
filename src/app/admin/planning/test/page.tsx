@@ -4,11 +4,64 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
+interface TeamData {
+  team_id: string
+  member_count: number
+  has_target_uuid: boolean
+  members: Array<{
+    user_id: string
+    display_name?: string
+    full_name?: string
+    email?: string
+  }>
+}
+
+interface TasksData {
+  active_tasks_count?: number
+  debug_info?: {
+    total_tasks: number
+  }
+  status_summary?: Record<string, number>
+  active_plans?: unknown[]
+  active_tasks?: Array<{
+    id: string
+    title: string
+    day_of_week: number
+    assignee_id: string
+  }>
+  success?: boolean
+  cleared_plans?: number
+  archived_tasks?: boolean
+  current_state?: unknown
+}
+
+interface RebuildResult {
+  success?: boolean
+  message?: string
+  error?: string
+  plan?: {
+    title: string
+    status: string
+  }
+  plan_tasks_count?: number
+  ai_conversation?: {
+    ai_task_count: number
+    assignment_keys: string[]
+  }
+}
+
+interface SetupResult {
+  success: boolean
+  message: string
+  users_found: number
+  members_added: number
+}
+
 export default function TestPage() {
-  const [teamData, setTeamData] = useState<any>(null)
-  const [rebuildResult, setRebuildResult] = useState<any>(null)
-  const [setupResult, setSetupResult] = useState<any>(null)
-  const [tasksData, setTasksData] = useState<any>(null)
+  const [teamData, setTeamData] = useState<TeamData | null>(null)
+  const [rebuildResult, setRebuildResult] = useState<RebuildResult | null>(null)
+  const [setupResult, setSetupResult] = useState<SetupResult | null>(null)
+  const [tasksData, setTasksData] = useState<TasksData | null>(null)
   const [planId, setPlanId] = useState('')
 
   const checkTeamMembers = async () => {
@@ -98,7 +151,7 @@ export default function TestPage() {
             <div className="mt-2">
               <h3 className="font-medium">Members:</h3>
               <ul className="text-sm space-y-1">
-                {teamData.members.map((m: any) => (
+                {teamData.members.map((m) => (
                   <li key={m.user_id}>
                     {m.user_id} - {m.display_name || m.full_name || m.email}
                   </li>
@@ -231,7 +284,7 @@ export default function TestPage() {
               <div className="mt-2">
                 <h3 className="font-medium">Sample Active Tasks:</h3>
                 <ul className="text-xs space-y-1">
-                  {tasksData.active_tasks.slice(0, 3).map((t: any) => (
+                  {tasksData.active_tasks.slice(0, 3).map((t) => (
                     <li key={t.id}>
                       {t.title} (Day: {t.day_of_week}, Assignee: {t.assignee_id?.slice(0, 8)}...)
                     </li>
