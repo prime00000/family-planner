@@ -151,11 +151,29 @@ export default function Phase3PlanningPage() {
 
       const plan = await generateInitialPlan({
         priorityGuidance: guidance || undefined,
-        incompleteTasks: incompleteTasks || [],
+        incompleteTasks: (incompleteTasks || []).map(t => ({
+          id: t.id,
+          description: t.description,
+          importance: t.importance ?? undefined,
+          urgency: t.urgency ?? undefined
+        })),
         newItems: {
-          objectives: objectives || [],
-          tasks: newTasks || [],
-          maintenance: maintenance || []
+          objectives: (objectives || []).map(o => ({
+            id: o.id,
+            description: o.description,
+            importance: o.importance ?? undefined
+          })),
+          tasks: (newTasks || []).map(t => ({
+            id: t.id,
+            description: t.description,
+            importance: t.importance ?? undefined,
+            urgency: t.urgency ?? undefined
+          })),
+          maintenance: (maintenance || []).map(m => ({
+            id: m.id,
+            description: m.description || '',
+            frequency: m.frequency ?? undefined
+          }))
         },
         teamMembers: transformedMembers
       })
