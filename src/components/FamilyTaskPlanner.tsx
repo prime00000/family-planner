@@ -156,16 +156,18 @@ export default function FamilyTaskPlanner() {
             updated_at: task.updated_at || new Date().toISOString(),
           }
 
-          // Group tasks by day_of_week
+          // Group tasks by day_of_week - only show pending, deck, and completed tasks
           if (task.status === 'completed') {
             acc.completed.push(transformedTask)
           } else if (task.status === 'deck') {
             acc.deck.push(transformedTask)
-          } else {
+          } else if (task.status === 'pending') {
+            // Only show pending tasks in the weekly view
             // Map day_of_week number back to section key
             const dayKey = Object.entries(dayMapping).find(([, value]) => value === task.day_of_week)?.[0] || 'anytime'
             acc[dayKey].push(transformedTask)
           }
+          // Skip backlog and other statuses
 
           return acc
         }, {

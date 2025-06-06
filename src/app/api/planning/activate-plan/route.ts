@@ -50,25 +50,44 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Deactivate any currently active plans for this team
-    const { error: deactivateError } = await supabase
+    // First, find active plans with the same week_start_date
+    const weekStartDate = plan.week_start_date || getWeekStartDate()
+    
+    const { data: activePlans, error: findError } = await supabase
       .from('weekly_plans')
-      .update({ status: 'completed' })
+      .select('id')
       .eq('team_id', TEAM_ID)
       .eq('status', 'active')
+      .eq('week_start_date', weekStartDate)
       .neq('id', planId)
 
-    if (deactivateError) {
-      console.error('Failed to deactivate other plans:', deactivateError)
+    if (activePlans && activePlans.length > 0) {
+      // Set them to completed and clear their week_start_date
+      const { error: deactivateError } = await supabase
+        .from('weekly_plans')
+        .update({ 
+          status: 'completed',
+          week_start_date: null 
+        })
+        .in('id', activePlans.map(p => p.id))
+
+      if (deactivateError) {
+        console.error('Failed to deactivate other plans:', deactivateError)
+      }
     }
 
-    // 3. Archive current active tasks for the team by updating their status to 'backlog'
-    const { error: archiveError } = await supabase
+    // 3. Archive ALL current non-completed tasks for the team
+    const { data: archivedTasks, error: archiveError } = await supabase
       .from('tasks')
       .update({ status: 'backlog' })
       .eq('team_id', TEAM_ID)
-      .in('status', ['pending', 'active'])
+      .in('status', ['pending', 'deck'])  // Archive both pending and deck tasks
+      .select()
+
+    console.log(`Archived ${archivedTasks?.length || 0} existing tasks to backlog`)
 
     if (archiveError) {
+      console.error('Archive error:', archiveError)
       throw new Error(`Failed to archive current tasks: ${archiveError.message}`)
     }
 
@@ -77,6 +96,8 @@ export async function POST(request: NextRequest) {
       .from('plan_tasks')
       .select('*')
       .eq('weekly_plan_id', planId)
+
+    console.log(`Found ${planTasks?.length || 0} plan_tasks for plan ${planId}`)
 
     if (planTasksError) {
       throw new Error(`Failed to fetch plan tasks: ${planTasksError.message}`)
@@ -89,36 +110,38 @@ export async function POST(request: NextRequest) {
       const tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = planTasks.map(planTask => ({
         team_id: TEAM_ID,
         assignee_id: planTask.assignee_id,
-        created_by: plan.created_by,
-        title: planTask.description,
-        description: planTask.description,
-        importance: planTask.importance || 5,
-        urgency: planTask.urgency || 5,
+        submitted_by: plan.created_by,  // Changed from created_by
+        description: planTask.description,  // Removed title field
+        importance: planTask.importance || 3,
+        urgency: planTask.urgency || 3,
         day_of_week: planTask.day_of_week,
-        status: 'active',
-        // Link back to the plan_task
-        plan_task_id: planTask.id
+        status: 'pending',  // UI expects 'pending' for active tasks
+        // Note: plan_task_id doesn't exist in tasks table
       }))
 
-      const { error: insertError } = await supabase
+      console.log(`Attempting to insert ${tasksToInsert.length} tasks`)
+      console.log('First task to insert:', tasksToInsert[0])
+
+      const { data: insertedTasks, error: insertError } = await supabase
         .from('tasks')
         .insert(tasksToInsert)
+        .select()
 
       if (insertError) {
+        console.error('Insert error details:', insertError)
         throw new Error(`Failed to create tasks: ${insertError.message}`)
       }
 
-      tasksActivated = tasksToInsert.length
+      console.log(`Successfully inserted ${insertedTasks?.length || 0} tasks`)
+      tasksActivated = insertedTasks?.length || 0
     }
 
     // 6. Update the weekly_plan status to 'active' and set week_start_date
-    const weekStartDate = plan.week_start_date || getWeekStartDate()
-    
     const { error: updatePlanError } = await supabase
       .from('weekly_plans')
       .update({ 
         status: 'active',
-        week_start_date: weekStartDate
+        week_start_date: weekStartDate  // Using the weekStartDate from earlier
       })
       .eq('id', planId)
 
