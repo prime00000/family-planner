@@ -283,7 +283,7 @@ export default function TestPage() {
                 </pre>
               </div>
             )}
-            {tasksData.active_tasks?.length > 0 && (
+            {tasksData.active_tasks && tasksData.active_tasks.length > 0 && (
               <div className="mt-2">
                 <h3 className="font-medium">Sample Active Tasks:</h3>
                 <ul className="text-xs space-y-1">
