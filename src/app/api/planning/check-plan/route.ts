@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       ai_conversation: {
         has_final_plan: hasAiTasks,
         ai_task_count: aiTaskCount,
-        assignment_keys: hasAiTasks ? Object.keys(aiConversation.finalPlan.assignments) : []
+        assignment_keys: hasAiTasks && aiConversation?.finalPlan?.assignments ? Object.keys(aiConversation.finalPlan.assignments) : []
       }
     })
 
