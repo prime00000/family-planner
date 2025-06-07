@@ -741,7 +741,7 @@ export default function FamilyTaskPlanner() {
       </main>
 
       {/* Fixed Bottom Navigation */}
-      <nav className="fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 px-2 py-1 overflow-hidden">
+      <nav className="fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 px-2 py-1 pb-2 overflow-hidden">
         <div className="flex justify-around">
           {[
             { icon: Home, key: "home", label: "Home" },
