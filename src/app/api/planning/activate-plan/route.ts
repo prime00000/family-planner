@@ -66,8 +66,7 @@ export async function POST(request: NextRequest) {
       const { error: deactivateError } = await supabase
         .from('weekly_plans')
         .update({ 
-          status: 'completed',
-          week_start_date: null 
+          status: 'completed'
         })
         .in('id', activePlans.map(p => p.id))
 
