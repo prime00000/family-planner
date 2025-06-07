@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
     const aiConversation = plan.ai_conversation as AiConversation
     const hasAiTasks = !!(aiConversation?.finalPlan?.assignments)
-    const aiTaskCount = hasAiTasks ? 
+    const aiTaskCount = hasAiTasks && aiConversation?.finalPlan?.assignments ? 
       Object.values(aiConversation.finalPlan.assignments).reduce((sum: number, user: Record<string, unknown>) => {
         return sum + Object.values(user)
           .filter(v => Array.isArray(v))
