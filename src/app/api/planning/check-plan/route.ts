@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       plan: {
         id: plan.id,
-        title: plan.title,
+        title: (plan as any).title || 'Untitled Plan',
         status: plan.status,
         team_id: plan.team_id
       },
