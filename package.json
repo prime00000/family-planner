@@ -5,8 +5,12 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:deploy": "next build",
+    "build:strict": "tsc --noEmit && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "build:test": "npm run type-check && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.53.0",
