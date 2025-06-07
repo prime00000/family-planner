@@ -22,7 +22,7 @@ export async function POST() {
     // 2. Clear week_start_date from non-active plans
     const { data: clearedPlans } = await supabase
       .from('weekly_plans')
-      .update({ week_start_date: null })
+      .update({ week_start_date: '' })
       .eq('team_id', TEAM_ID)
       .neq('status', 'active')
       .not('week_start_date', 'is', null)
