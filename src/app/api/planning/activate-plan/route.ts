@@ -106,17 +106,21 @@ export async function POST(request: NextRequest) {
 
     // 5. Copy all plan_tasks to the tasks table
     if (planTasks && planTasks.length > 0) {
-      const tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = planTasks.map(planTask => ({
-        team_id: TEAM_ID,
-        assignee_id: planTask.assignee_id,
-        submitted_by: plan.created_by,  // Changed from created_by
-        description: planTask.description,  // Removed title field
-        importance: planTask.importance || 3,
-        urgency: planTask.urgency || 3,
-        day_of_week: planTask.day_of_week,
-        status: 'pending',  // UI expects 'pending' for active tasks
-        // Note: plan_task_id doesn't exist in tasks table
-      }))
+      const tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = planTasks.map(planTask => {
+        // Cast to include our added fields
+        const task = planTask as typeof planTask & { importance?: number; urgency?: number }
+        return {
+          team_id: TEAM_ID,
+          assignee_id: task.assignee_id,
+          submitted_by: plan.created_by,  // Changed from created_by
+          description: task.description,  // Removed title field
+          importance: task.importance || 3,
+          urgency: task.urgency || 3,
+          day_of_week: task.day_of_week,
+          status: 'pending',  // UI expects 'pending' for active tasks
+          // Note: plan_task_id doesn't exist in tasks table
+        }
+      })
 
       console.log(`Attempting to insert ${tasksToInsert.length} tasks`)
       console.log('First task to insert:', tasksToInsert[0])
