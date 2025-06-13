@@ -176,6 +176,8 @@ Important:
 }
 
 export async function POST(request: NextRequest) {
+  console.log('Generate plan called, API key present:', !!process.env.ANTHROPIC_API_KEY)
+  
   try {
     const body = await request.json() as GeneratePlanRequest
 
@@ -300,6 +302,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(planData)
   } catch (error) {
     console.error('Error generating plan:', error)
+    console.error('Error details:', {
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      anthropicKeyPresent: !!process.env.ANTHROPIC_API_KEY,
+      supabaseUrlPresent: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseKeyPresent: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to generate plan' },
       { status: 500 }

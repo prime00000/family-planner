@@ -112,6 +112,8 @@ Make sure to:
 }
 
 export async function POST(request: NextRequest) {
+  console.log('Refine plan called, API key present:', !!process.env.ANTHROPIC_API_KEY)
+  
   try {
     const body = await request.json() as RefinePlanRequest
 
