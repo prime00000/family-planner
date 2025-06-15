@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { VibePlanFile, ConversationExchange } from '@/app/admin/planning/phase3/types'
 
-// Using Claude Opus 4 - most capable model for complex family planning logic
+// Using Claude Sonnet 3.7 - excellent balance of capability and speed
 // Can override with ANTHROPIC_MODEL env var if needed
-const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-20250514"
+const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-3-7-sonnet-20250219"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
