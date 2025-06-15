@@ -57,7 +57,7 @@ const USER_ID = 'a0000000-0000-0000-0000-000000000001'
 
 export default function FamilyTaskPlanner() {
   const { user } = useAuth()
-  const [selectedUser, setSelectedUser] = useState("All Tasks")
+  const [selectedUser, setSelectedUser] = useState("")
   const [activeTab, setActiveTab] = useState("home")
   const [manualAddDay, setManualAddDay] = useState<string | null>(null)
   const [tasks, setTasks] = useState<Record<string, Task[]>>({
@@ -98,6 +98,23 @@ export default function FamilyTaskPlanner() {
   } | null>(null)
 
   const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
+  
+  // Set default user filter based on logged-in user
+  useEffect(() => {
+    if (user && !selectedUser) {
+      // Try to match by email first (e.g., kurt@example.com -> Kurt)
+      const firstName = user.email?.split('@')[0]?.toLowerCase()
+      const matchedUser = users.find(u => u.toLowerCase() === firstName)
+      
+      if (matchedUser) {
+        setSelectedUser(matchedUser)
+      } else {
+        // If no match found, default to "All Tasks"
+        setSelectedUser("All Tasks")
+      }
+    }
+  }, [user, selectedUser])
+  
   const sections = [
     { key: "monday", name: "Monday" },
     { key: "tuesday", name: "Tuesday" },
