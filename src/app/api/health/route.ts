@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
+  // Health check endpoint - updated for deployment trigger
   const healthStatus = {
     status: 'ok',
     environment: {
