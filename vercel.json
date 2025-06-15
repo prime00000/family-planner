@@ -1,16 +1,16 @@
 {
   "functions": {
     "src/app/api/planning/generate-plan/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "src/app/api/planning/refine-plan/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "app/api/planning/generate-plan/route.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "app/api/planning/refine-plan/route.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

@@ -242,9 +242,9 @@ export async function POST(request: NextRequest) {
       ]
     })
     
-    // Add timeout handling (50 seconds to stay under Vercel's 60s limit)
+    // Add timeout handling (230 seconds to stay under 240s limit)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('AI request timed out after 50 seconds')), 50000)
+      setTimeout(() => reject(new Error('AI request timed out after 230 seconds')), 230000)
     })
     
     const message = await Promise.race([messagePromise, timeoutPromise]) as Awaited<typeof messagePromise>

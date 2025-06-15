@@ -131,7 +131,11 @@ export async function POST(request: NextRequest) {
 
     const prompt = createRefinementPrompt(body)
 
-    const message = await anthropic.messages.create({
+    console.log('Starting AI refinement with model:', AI_MODEL)
+    console.log('Prompt length:', prompt.length, 'characters')
+    
+    // Create the message with a timeout wrapper
+    const messagePromise = anthropic.messages.create({
       model: AI_MODEL,
       max_tokens: 20000,
       temperature: 0.7,
@@ -143,6 +147,13 @@ export async function POST(request: NextRequest) {
         }
       ]
     })
+    
+    // Add timeout handling (230 seconds to stay under 240s limit)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('AI request timed out after 230 seconds')), 230000)
+    })
+    
+    const message = await Promise.race([messagePromise, timeoutPromise]) as Awaited<typeof messagePromise>
 
     // Log token usage
     console.log('=== PLAN REFINEMENT COMPLETE ===')
