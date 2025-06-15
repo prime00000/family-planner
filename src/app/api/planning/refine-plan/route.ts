@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const message = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4000,
+      max_tokens: 8000,
       temperature: 0.7,
       system: `You are a family task planning AI. When updating plans, you must return the COMPLETE updated plan with ALL users and ALL tasks, not just the changes. The current plan structure is: ${JSON.stringify(body.currentPlan, null, 2)}`,
       messages: [
