@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { VibePlanFile, ConversationExchange } from '@/app/admin/planning/phase3/types'
 
+// Using Claude Opus 4 - most capable model for complex family planning logic
+// Can override with ANTHROPIC_MODEL env var if needed
+const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-20250514"
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
@@ -113,6 +117,7 @@ Make sure to:
 
 export async function POST(request: NextRequest) {
   console.log('Refine plan called, API key present:', !!process.env.ANTHROPIC_API_KEY)
+  console.log('Using AI model:', AI_MODEL)
   
   try {
     const body = await request.json() as RefinePlanRequest
@@ -127,8 +132,8 @@ export async function POST(request: NextRequest) {
     const prompt = createRefinementPrompt(body)
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 8000,
+      model: AI_MODEL,
+      max_tokens: 20000,
       temperature: 0.7,
       system: `You are a family task planning AI. When updating plans, you must return the COMPLETE updated plan with ALL users and ALL tasks, not just the changes. The current plan structure is: ${JSON.stringify(body.currentPlan, null, 2)}`,
       messages: [

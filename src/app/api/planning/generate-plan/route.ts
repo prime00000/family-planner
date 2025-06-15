@@ -5,6 +5,10 @@ import type { Database } from '@/types/supabase'
 import type { VibePlanFile } from '@/app/admin/planning/phase3/types'
 import { TEAM_ID } from '@/lib/constants'
 
+// Using Claude Opus 4 - most capable model for complex family planning logic
+// Can override with ANTHROPIC_MODEL env var if needed
+const AI_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-20250514"
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
@@ -177,6 +181,7 @@ Important:
 
 export async function POST(request: NextRequest) {
   console.log('Generate plan called, API key present:', !!process.env.ANTHROPIC_API_KEY)
+  console.log('Using AI model:', AI_MODEL)
   
   try {
     const body = await request.json() as GeneratePlanRequest
@@ -222,8 +227,8 @@ export async function POST(request: NextRequest) {
     const prompt = createTaskPrompt({ ...body, teamMembersWithUUIDs })
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 8000,
+      model: AI_MODEL,
+      max_tokens: 20000,
       temperature: 0.7,
       messages: [
         {
