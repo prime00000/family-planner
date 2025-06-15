@@ -14,12 +14,14 @@ import { supabase } from '@/lib/supabase'
 import type { VibePlanFile, ConversationExchange } from './types'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
 
 export default function Phase3PlanningPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAdmin } = useAuth()
   const { phase, setPhase } = usePlanningStore()
+  const { toast } = useToast()
   
   // Edit mode state
   const [editPlanId, setEditPlanId] = useState<string | null>(null)
@@ -184,9 +186,21 @@ export default function Phase3PlanningPage() {
       if (plan.title) {
         setPlanTitle(plan.title)
       }
+      
+      // Show success toast
+      toast({
+        title: "Plan generated successfully",
+        description: "Your weekly plan has been created.",
+        duration: 3000,
+      })
     } catch (error) {
       console.error('Error generating plan:', error)
-      // TODO: Show error toast
+      toast({
+        title: "Plan generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate plan",
+        variant: "destructive",
+        duration: 5000,
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -217,9 +231,21 @@ export default function Phase3PlanningPage() {
         timestamp: new Date().toISOString()
       }])
       setSelectedTaskIds(new Set()) // Clear selections after refinement
+      
+      // Show success toast
+      toast({
+        title: "Plan refined successfully",
+        description: "Your plan has been updated based on your feedback.",
+        duration: 3000,
+      })
     } catch (error) {
       console.error('Error refining plan:', error)
-      // TODO: Show error toast
+      toast({
+        title: "Refinement failed",
+        description: error instanceof Error ? error.message : "Failed to refine plan",
+        variant: "destructive",
+        duration: 5000,
+      })
     } finally {
       setIsProcessing(false)
     }

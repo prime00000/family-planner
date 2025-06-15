@@ -238,6 +238,15 @@ export async function POST(request: NextRequest) {
       ]
     })
 
+    // Log token usage
+    console.log('=== PLAN GENERATION COMPLETE ===')
+    console.log('Token usage:', {
+      input_tokens: message.usage.input_tokens,
+      output_tokens: message.usage.output_tokens,
+      total_tokens: message.usage.input_tokens + message.usage.output_tokens
+    })
+    console.log('================================')
+
     // Extract JSON from the response
     const content = message.content[0]
     if (content.type !== 'text') {
