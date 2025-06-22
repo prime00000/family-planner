@@ -55,6 +55,72 @@ interface GeneratePlanRequest {
 }
 
 
+// Helper function to sanitize AI response
+function sanitizeAIResponse(response: string): string {
+  // Remove markdown code blocks
+  response = response.replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
+  
+  // Remove any text before first { and after last }
+  const firstBrace = response.indexOf('{')
+  const lastBrace = response.lastIndexOf('}')
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    response = response.substring(firstBrace, lastBrace + 1)
+  }
+  
+  // Remove any leading/trailing whitespace
+  response = response.trim()
+  
+  // Log what we're sanitizing
+  console.log('Sanitized response preview:', response.substring(0, 200) + '...')
+  
+  return response
+}
+
+// Helper function to validate the plan structure
+function validateVibePlanFile(data: any): boolean {
+  if (!data || typeof data !== 'object') {
+    console.error('Response is not an object')
+    return false
+  }
+  
+  if (!data.assignments || typeof data.assignments !== 'object') {
+    console.error('Missing or invalid assignments')
+    return false
+  }
+  
+  // Check each user has all required days
+  for (const [userId, userPlan] of Object.entries(data.assignments)) {
+    const requiredDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'anytime_this_week', 'deck']
+    for (const day of requiredDays) {
+      if (!Array.isArray((userPlan as any)[day])) {
+        console.error(`User ${userId} missing or invalid ${day} array`)
+        return false
+      }
+    }
+    
+    // Check user_name exists
+    if (!(userPlan as any).user_name) {
+      console.error(`User ${userId} missing user_name`)
+      return false
+    }
+  }
+  
+  // Check metadata
+  if (!data.metadata || typeof data.metadata !== 'object') {
+    console.error('Missing or invalid metadata')
+    return false
+  }
+  
+  // Check statistics
+  if (!data.statistics || typeof data.statistics !== 'object') {
+    console.error('Missing or invalid statistics')
+    return false
+  }
+  
+  console.log('Validation passed')
+  return true
+}
+
 const FAMILY_CONTEXT = `
 You are planning tasks for the Theobald family:
 - Kurt (adult, father): Tech professional, handles complex work tasks and family planning
@@ -112,45 +178,59 @@ Create a balanced weekly plan. For each person, assign tasks to specific days (M
 
 IMPORTANT: Create an entry in the assignments object for EACH team member listed above using their exact UUID as the key. Do not use names as keys.
 
-Return a JSON object with this EXACT structure - NOTE: Use UUIDs as keys in assignments:
+CRITICAL: Your response must be ONLY a valid JSON object. No markdown, no code blocks, no explanations before or after the JSON.
+
+Return EXACTLY this structure (starting with { and ending with }):
 {
   "title": "Suggested plan title that captures the week's theme or main focus",
   "assignments": {
     "${exampleUUID1}": {
       "user_name": "${exampleName1}",
-      "monday": [tasks],
-      "tuesday": [tasks],
-      "wednesday": [tasks],
-      "thursday": [tasks],
-      "friday": [tasks],
-      "saturday": [tasks],
-      "sunday": [tasks],
-      "anytime_this_week": [tasks],
-      "deck": [tasks]
+      "monday": [
+        {
+          "id": "task-${Date.now()}-1",
+          "description": "Complete homework assignment",
+          "importance": 4,
+          "urgency": 5,
+          "tags": ["school", "high-priority"],
+          "source": "task"
+        }
+      ],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [],
+      "friday": [],
+      "saturday": [],
+      "sunday": [],
+      "anytime_this_week": [],
+      "deck": []
     },
     "${exampleUUID2}": {
       "user_name": "${exampleName2}",
-      "monday": [tasks],
-      "tuesday": [tasks],
-      "wednesday": [tasks],
-      "thursday": [tasks],
-      "friday": [tasks],
-      "saturday": [tasks],
-      "sunday": [tasks],
-      "anytime_this_week": [tasks],
-      "deck": [tasks]
+      "monday": [],
+      "tuesday": [],
+      "wednesday": [],
+      "thursday": [],
+      "friday": [],
+      "saturday": [],
+      "sunday": [],
+      "anytime_this_week": [],
+      "deck": []
     }
   },
   "metadata": {
-    "priorityGuidance": "user's priority guidance here",
-    "generatedAt": "ISO date string",
+    "priorityGuidance": "${priorityGuidance || 'No specific guidance provided'}",
+    "generatedAt": "${new Date().toISOString()}",
     "version": 1
   },
   "statistics": {
-    "total_tasks": number,
-    "tasks_per_person": { "uuid1": count, "uuid2": count },
-    "high_priority_count": number,
-    "scheduled_tasks_count": number
+    "total_tasks": ${incompleteTasks.length + newItems.tasks.length + newItems.objectives.length + newItems.maintenance.length},
+    "tasks_per_person": {
+      "${exampleUUID1}": 1,
+      "${exampleUUID2}": 0
+    },
+    "high_priority_count": 1,
+    "scheduled_tasks_count": 1
   }
 }
 
@@ -168,13 +248,23 @@ Each task should have:
   }
 }
 
-Important:
+Rules for JSON generation:
+- Each day array contains task objects
+- All fields shown are required
+- NO comments allowed in JSON
+- NO trailing commas
+- Use double quotes only
+- Response starts with { and ends with }
+- Each task must have: id, description, importance (1-5), urgency (1-5), tags (array), source
+
+Important task assignment rules:
 - Balance workload by age and availability
 - School-age children should have fewer tasks on weekdays
 - High importance/urgency tasks should go to adults
 - Keep task descriptions clear and actionable
 - Use appropriate tags like "school", "home", "work", "family"
-`
+
+Remember: Return ONLY the JSON object. Do not include any text before the { or after the closing }`
 
   return prompt
 }
@@ -264,26 +354,47 @@ export async function POST(request: NextRequest) {
       throw new Error('Unexpected response type from AI')
     }
 
+    // Log raw AI response for debugging
+    console.log('=== RAW AI RESPONSE START ===')
+    console.log(content.text)
+    console.log('=== RAW AI RESPONSE END ===')
+    console.log('Response type:', typeof content.text)
+    console.log('Response length:', content.text.length)
+
     // Parse the JSON response
     let planData: VibePlanFile
     try {
-      // Find JSON in the response (it might be wrapped in markdown code blocks)
-      const jsonMatch = content.text.match(/```json\n?([\s\S]*?)\n?```/) || 
-                       content.text.match(/({[\s\S]*})/)
+      // Sanitize the response first
+      const sanitized = sanitizeAIResponse(content.text)
       
-      if (!jsonMatch) {
-        throw new Error('No JSON found in AI response')
-      }
-
-      planData = JSON.parse(jsonMatch[1])
-    } catch {
-      console.error('Failed to parse AI response:', content.text)
-      throw new Error('Failed to parse AI response as JSON')
+      // Try to parse the sanitized response
+      planData = JSON.parse(sanitized)
+      console.log('Successfully parsed JSON')
+      
+    } catch (error) {
+      console.error('JSON Parse Error:', error)
+      console.error('Failed to parse:', content.text.substring(0, 500))
+      
+      // Return a proper error response instead of throwing
+      return NextResponse.json({
+        error: 'Failed to generate valid plan',
+        details: 'AI response was not in expected JSON format',
+        retry: true,
+        debugInfo: {
+          responseStart: content.text.substring(0, 200),
+          responseType: typeof content.text
+        }
+      }, { status: 500 })
     }
 
     // Validate the response structure
-    if (!planData.assignments || !planData.metadata || !planData.statistics) {
-      throw new Error('Invalid plan structure from AI')
+    if (!validateVibePlanFile(planData)) {
+      console.error('Validation failed for parsed data:', planData)
+      return NextResponse.json({
+        error: 'Generated plan failed validation',
+        details: 'The AI response was parsed but has invalid structure',
+        retry: true
+      }, { status: 500 })
     }
 
     // Ensure all user IDs from teamMembersWithUUIDs are included

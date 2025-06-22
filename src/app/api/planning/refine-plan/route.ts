@@ -10,6 +10,26 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
+// Helper function to sanitize AI response
+function sanitizeAIResponse(response: string): string {
+  // Remove markdown code blocks
+  response = response.replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
+  
+  // Remove any text before first { and after last }
+  const firstBrace = response.indexOf('{')
+  const lastBrace = response.lastIndexOf('}')
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    response = response.substring(firstBrace, lastBrace + 1)
+  }
+  
+  // Remove any leading/trailing whitespace
+  response = response.trim()
+  
+  console.log('Sanitized response preview:', response.substring(0, 200) + '...')
+  
+  return response
+}
+
 interface RefinePlanRequest {
   currentPlan: VibePlanFile
   feedback: string
@@ -94,23 +114,55 @@ Based on this feedback, update the plan. Common refinements include:
 - Combining or splitting tasks
 - Adding or removing tasks
 
-Return a JSON object with this structure:
+CRITICAL: Your response must be ONLY a valid JSON object. No markdown, no code blocks, no explanations before or after the JSON.
+
+Return EXACTLY this structure (starting with { and ending with }):
 {
   "updatedPlan": { 
-    // The complete updated VibePlanFile structure with all assignments, metadata, and statistics
-    // This should be the ENTIRE plan object, not just the changes
+    "title": "Updated plan title",
+    "assignments": {
+      "user-uuid-here": {
+        "user_name": "Person Name",
+        "monday": [array of task objects],
+        "tuesday": [array of task objects],
+        "wednesday": [array of task objects],
+        "thursday": [array of task objects],
+        "friday": [array of task objects],
+        "saturday": [array of task objects],
+        "sunday": [array of task objects],
+        "anytime_this_week": [array of task objects],
+        "deck": [array of task objects]
+      }
+    },
+    "metadata": {
+      "priorityGuidance": "string",
+      "generatedAt": "ISO date string",
+      "version": number
+    },
+    "statistics": {
+      "total_tasks": number,
+      "tasks_per_person": {},
+      "high_priority_count": number,
+      "scheduled_tasks_count": number
+    }
   },
   "explanation": "Brief explanation of what changes were made and why"
 }
 
-Make sure to:
-1. Include ALL users and ALL their tasks in the updatedPlan, not just the ones you changed
-2. Maintain the exact same structure as the current plan
-3. Update the version number in metadata
-4. Recalculate statistics after changes
-5. Keep all user assignments even if they have no tasks
-6. Be specific in your explanation about what changed
-7. Preserve all task IDs - don't generate new ones unless adding new tasks`
+Rules for JSON generation:
+- NO comments allowed in JSON
+- NO trailing commas
+- Use double quotes only
+- Response starts with { and ends with }
+- Include ALL users and ALL their tasks in the updatedPlan
+- Maintain the exact same structure as the current plan
+- Update the version number in metadata
+- Recalculate statistics after changes
+- Keep all user assignments even if they have no tasks
+- Be specific in your explanation about what changed
+- Preserve all task IDs - don't generate new ones unless adding new tasks
+
+Remember: Return ONLY the JSON object. Do not include any text before the { or after the closing }`
 
   return prompt
 }
@@ -170,21 +222,37 @@ export async function POST(request: NextRequest) {
       throw new Error('Unexpected response type from AI')
     }
 
+    // Log raw AI response for debugging
+    console.log('=== RAW AI REFINEMENT RESPONSE START ===')
+    console.log(content.text)
+    console.log('=== RAW AI REFINEMENT RESPONSE END ===')
+    console.log('Response type:', typeof content.text)
+    console.log('Response length:', content.text.length)
+
     // Parse the JSON response
     let refinementResult: { updatedPlan: VibePlanFile; explanation: string }
     try {
-      // Find JSON in the response
-      const jsonMatch = content.text.match(/```json\n?([\s\S]*?)\n?```/) || 
-                       content.text.match(/({[\s\S]*})/)
+      // Sanitize the response first
+      const sanitized = sanitizeAIResponse(content.text)
       
-      if (!jsonMatch) {
-        throw new Error('No JSON found in AI response')
-      }
-
-      refinementResult = JSON.parse(jsonMatch[1])
-    } catch {
-      console.error('Failed to parse AI response:', content.text)
-      throw new Error('Failed to parse AI response as JSON')
+      // Try to parse the sanitized response
+      refinementResult = JSON.parse(sanitized)
+      console.log('Successfully parsed refinement JSON')
+      
+    } catch (error) {
+      console.error('JSON Parse Error:', error)
+      console.error('Failed to parse:', content.text.substring(0, 500))
+      
+      // Return a proper error response instead of throwing
+      return NextResponse.json({
+        error: 'Failed to parse refinement response',
+        details: 'AI response was not in expected JSON format',
+        retry: true,
+        debugInfo: {
+          responseStart: content.text.substring(0, 200),
+          responseType: typeof content.text
+        }
+      }, { status: 500 })
     }
 
     // Validate the response
