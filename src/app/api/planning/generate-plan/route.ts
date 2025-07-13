@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
 import type { VibePlanFile } from '@/app/admin/planning/phase3/types'
 import { TEAM_ID } from '@/lib/constants'
+import { AgentOrchestrator } from '@/lib/planning/agents/agent-orchestrator'
 
 // Using Claude Sonnet 3.7 - excellent balance of capability and speed
 // Can override with ANTHROPIC_MODEL env var if needed
@@ -270,7 +271,10 @@ Remember: Return ONLY the JSON object. Do not include any text before the { or a
 }
 
 export async function POST(request: NextRequest) {
-  console.log('Generate plan called, API key present:', !!process.env.ANTHROPIC_API_KEY)
+  console.log('=== GENERATE PLAN API CALLED ===')
+  console.log('USE_NEW_PLANNING_SYSTEM env var:', process.env.USE_NEW_PLANNING_SYSTEM)
+  console.log('Is new system enabled?:', process.env.USE_NEW_PLANNING_SYSTEM === 'true')
+  console.log('API key present:', !!process.env.ANTHROPIC_API_KEY)
   console.log('Using AI model:', AI_MODEL)
   
   try {
@@ -282,160 +286,14 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    // Fetch team members with UUIDs from the database
-    const { data: teamMembersFromDB, error: teamError } = await supabase
-      .from('team_members')
-      .select('user_id, display_name, users!inner(full_name, email)')
-      .eq('team_id', TEAM_ID)
-
-    if (teamError || !teamMembersFromDB) {
-      throw new Error(`Failed to fetch team members: ${teamError?.message}`)
-    }
-
-    // Convert database format to TeamMember format with UUIDs
-    interface DBMember {
-      user_id: string
-      display_name?: string | null
-      users?: {
-        full_name?: string | null
-        email?: string
-      } | null
-    }
-    const teamMembersWithUUIDs: TeamMember[] = teamMembersFromDB.map((member: DBMember) => ({
-      id: member.user_id,
-      name: member.display_name || member.users?.full_name || 'Unknown',
-      email: member.users?.email || 'unknown@email.com'
-    }))
-
-    console.log('Team members with UUIDs:', teamMembersWithUUIDs)
-    console.log('Number of team members:', teamMembersWithUUIDs.length)
-    teamMembersWithUUIDs.forEach((member, idx) => {
-      console.log(`Team member ${idx + 1}: ${member.id} - ${member.name}`)
-    })
-
-    const prompt = createTaskPrompt({ ...body, teamMembersWithUUIDs })
-
-    console.log('Starting AI request with model:', AI_MODEL)
-    console.log('Prompt length:', prompt.length, 'characters')
     
-    // Create the message with a timeout wrapper
-    const messagePromise = anthropic.messages.create({
-      model: AI_MODEL,
-      max_tokens: 20000,
-      temperature: 0.7,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    })
-    
-    // Add timeout handling (290 seconds to stay under 300s Vercel limit)
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('AI request timed out after 290 seconds')), 290000)
-    })
-    
-    const message = await Promise.race([messagePromise, timeoutPromise]) as Awaited<typeof messagePromise>
-
-    // Log token usage
-    console.log('=== PLAN GENERATION COMPLETE ===')
-    console.log('Token usage:', {
-      input_tokens: message.usage.input_tokens,
-      output_tokens: message.usage.output_tokens,
-      total_tokens: message.usage.input_tokens + message.usage.output_tokens
-    })
-    console.log('================================')
-
-    // Extract JSON from the response
-    const content = message.content[0]
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from AI')
+    // Check if we should use the new planning system
+    if (process.env.USE_NEW_PLANNING_SYSTEM === 'true') {
+      return handleNewPlanningSystem(request, body)
     }
-
-    // Log raw AI response for debugging
-    console.log('=== RAW AI RESPONSE START ===')
-    console.log(content.text)
-    console.log('=== RAW AI RESPONSE END ===')
-    console.log('Response type:', typeof content.text)
-    console.log('Response length:', content.text.length)
-
-    // Parse the JSON response
-    let planData: VibePlanFile
-    try {
-      // Sanitize the response first
-      const sanitized = sanitizeAIResponse(content.text)
-      
-      // Try to parse the sanitized response
-      planData = JSON.parse(sanitized)
-      console.log('Successfully parsed JSON')
-      
-    } catch (error) {
-      console.error('JSON Parse Error:', error)
-      console.error('Failed to parse:', content.text.substring(0, 500))
-      
-      // Return a proper error response instead of throwing
-      return NextResponse.json({
-        error: 'Failed to generate valid plan',
-        details: 'AI response was not in expected JSON format',
-        retry: true,
-        debugInfo: {
-          responseStart: content.text.substring(0, 200),
-          responseType: typeof content.text
-        }
-      }, { status: 500 })
-    }
-
-    // Validate the response structure
-    if (!validateVibePlanFile(planData)) {
-      console.error('Validation failed for parsed data:', planData)
-      return NextResponse.json({
-        error: 'Generated plan failed validation',
-        details: 'The AI response was parsed but has invalid structure',
-        retry: true
-      }, { status: 500 })
-    }
-
-    // Ensure all user IDs from teamMembersWithUUIDs are included
-    for (const member of teamMembersWithUUIDs) {
-      if (!planData.assignments[member.id]) {
-        planData.assignments[member.id] = {
-          user_name: member.name,
-          monday: [],
-          tuesday: [],
-          wednesday: [],
-          thursday: [],
-          friday: [],
-          saturday: [],
-          sunday: [],
-          anytime_this_week: [],
-          deck: []
-        }
-      }
-    }
-
-    // Validate that assignment keys are UUIDs
-    console.log('Assignment keys in response:', Object.keys(planData.assignments))
-    console.log('Number of users with assignments:', Object.keys(planData.assignments).length)
-    console.log('Tasks per person:', planData.statistics.tasks_per_person)
     
-    // Log first few assignments for debugging
-    Object.entries(planData.assignments).slice(0, 2).forEach(([userId, userPlan]) => {
-      const taskCount = Object.values(userPlan).filter(v => Array.isArray(v))
-        .reduce((sum, tasks) => sum + tasks.length, 0)
-      console.log(`User ${userId} (${userPlan.user_name}): ${taskCount} tasks`)
-    })
-    
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    const invalidKeys = Object.keys(planData.assignments).filter(key => !uuidRegex.test(key))
-    
-    if (invalidKeys.length > 0) {
-      console.warn('AI response contains non-UUID keys:', invalidKeys)
-      console.warn('This may cause plan_tasks creation to fail')
-    }
-
-    return NextResponse.json(planData)
+    // Use legacy system
+    return legacyPlanGeneration(body)
   } catch (error) {
     console.error('Error generating plan:', error)
     console.error('Error details:', {
@@ -451,4 +309,275 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Handler for the new multi-agent planning system
+async function handleNewPlanningSystem(
+  request: NextRequest,
+  body: GeneratePlanRequest
+): Promise<NextResponse> {
+  console.log('Using new multi-agent planning system')
+  
+  try {
+    // Get user ID from session/auth (simplified for now)
+    const userId = request.headers.get('x-user-id') || 'system'
+    
+    // Prepare data in the format the orchestrator expects
+    const teamMembers = body.teamMembers.map(m => ({
+      id: m.id,
+      name: m.name,
+      email: m.email
+    }))
+    
+    const availableBacklog = [
+      ...body.incompleteTasks.map(t => ({
+        ...t,
+        tags: [] as string[],
+        status: 'active' as const
+      })),
+      ...body.newItems.tasks.map(t => ({
+        ...t,
+        id: `new-task-${Date.now()}-${Math.random()}`,
+        tags: [] as string[],
+        status: 'new' as const
+      }))
+    ]
+    
+    const activeObjectives = body.newItems.objectives
+    
+    // Convert maintenance items to recurring tasks
+    const recurringTasksDue = body.newItems.maintenance.map(m => ({
+      id: m.id,
+      description: m.description,
+      frequency: m.frequency || 'weekly',
+      last_completed_date: null,
+      next_due_date: new Date().toISOString()
+    }))
+    
+    // Initialize orchestrator
+    const orchestrator = new AgentOrchestrator()
+    
+    // If we have priority guidance, use it as admin instructions
+    const adminInstructions = body.priorityGuidance || 'Create a balanced weekly plan for the family'
+    
+    // Start with dialogue phase
+    const dialogueResult = await orchestrator.startDialogue({
+      adminInstructions,
+      teamMembers,
+      availableBacklog,
+      activeObjectives,
+      precedingPlans: [], // Could fetch from DB if needed
+      recurringTasksDue,
+      weekStartDate: new Date().toISOString().split('T')[0],
+      userId,
+      teamId: TEAM_ID
+    })
+    
+    if (dialogueResult.error) {
+      throw new Error(dialogueResult.error)
+    }
+    
+    // For backward compatibility, auto-approve and execute the plan
+    console.log('Auto-approving plan for backward compatibility')
+    const executionResult = await orchestrator.executeApprovedPlan(
+      {
+        adminInstructions,
+        teamMembers,
+        availableBacklog,
+        activeObjectives,
+        precedingPlans: [],
+        recurringTasksDue,
+        weekStartDate: new Date().toISOString().split('T')[0],
+        userId,
+        teamId: TEAM_ID
+      },
+      {
+        approved: true,
+        adjustments: undefined
+      }
+    )
+    
+    if (executionResult.error) {
+      throw new Error(executionResult.error)
+    }
+    
+    if (!executionResult.finalPlan) {
+      throw new Error('No plan generated by new system')
+    }
+    
+    // Log agent system usage
+    console.log('=== NEW PLANNING SYSTEM COMPLETE ===')
+    console.log('Plan title:', executionResult.finalPlan.title)
+    console.log('Total tasks:', executionResult.finalPlan.statistics.total_tasks)
+    console.log('Used multi-agent orchestration')
+    console.log('===================================')
+    
+    return NextResponse.json(executionResult.finalPlan)
+    
+  } catch (error) {
+    console.error('New planning system error:', error)
+    console.log('Falling back to legacy system due to error')
+    
+    // Fallback to legacy system on error
+    return legacyPlanGeneration(body)
+  }
+}
+
+// Extract legacy plan generation into separate function
+async function legacyPlanGeneration(body: GeneratePlanRequest): Promise<NextResponse> {
+  console.log('Using legacy planning system')
+  
+  // Fetch team members with UUIDs from the database
+  const { data: teamMembersFromDB, error: teamError } = await supabase
+    .from('team_members')
+    .select('user_id, display_name, users!inner(full_name, email)')
+    .eq('team_id', TEAM_ID)
+
+  if (teamError || !teamMembersFromDB) {
+    throw new Error(`Failed to fetch team members: ${teamError?.message}`)
+  }
+
+  // Convert database format to TeamMember format with UUIDs
+  interface DBMember {
+    user_id: string
+    display_name?: string | null
+    users?: {
+      full_name?: string | null
+      email?: string
+    } | null
+  }
+  const teamMembersWithUUIDs: TeamMember[] = teamMembersFromDB.map((member: DBMember) => ({
+    id: member.user_id,
+    name: member.display_name || member.users?.full_name || 'Unknown',
+    email: member.users?.email || 'unknown@email.com'
+  }))
+
+  console.log('Team members with UUIDs:', teamMembersWithUUIDs)
+  console.log('Number of team members:', teamMembersWithUUIDs.length)
+  teamMembersWithUUIDs.forEach((member, idx) => {
+    console.log(`Team member ${idx + 1}: ${member.id} - ${member.name}`)
+  })
+
+  const prompt = createTaskPrompt({ ...body, teamMembersWithUUIDs })
+
+  console.log('Starting AI request with model:', AI_MODEL)
+  console.log('Prompt length:', prompt.length, 'characters')
+  
+  // Create the message with a timeout wrapper
+  const messagePromise = anthropic.messages.create({
+    model: AI_MODEL,
+    max_tokens: 20000,
+    temperature: 0.7,
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ]
+  })
+  
+  // Add timeout handling (290 seconds to stay under 300s Vercel limit)
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('AI request timed out after 290 seconds')), 290000)
+  })
+  
+  const message = await Promise.race([messagePromise, timeoutPromise]) as Awaited<typeof messagePromise>
+
+  // Log token usage
+  console.log('=== PLAN GENERATION COMPLETE ===')
+  console.log('Token usage:', {
+    input_tokens: message.usage.input_tokens,
+    output_tokens: message.usage.output_tokens,
+    total_tokens: message.usage.input_tokens + message.usage.output_tokens
+  })
+  console.log('================================')
+
+  // Extract JSON from the response
+  const content = message.content[0]
+  if (content.type !== 'text') {
+    throw new Error('Unexpected response type from AI')
+  }
+
+  // Log raw AI response for debugging
+  console.log('=== RAW AI RESPONSE START ===')
+  console.log(content.text)
+  console.log('=== RAW AI RESPONSE END ===')
+  console.log('Response type:', typeof content.text)
+  console.log('Response length:', content.text.length)
+
+  // Parse the JSON response
+  let planData: VibePlanFile
+  try {
+    // Sanitize the response first
+    const sanitized = sanitizeAIResponse(content.text)
+    
+    // Try to parse the sanitized response
+    planData = JSON.parse(sanitized)
+    console.log('Successfully parsed JSON')
+    
+  } catch (error) {
+    console.error('JSON Parse Error:', error)
+    console.error('Failed to parse:', content.text.substring(0, 500))
+    
+    // Return a proper error response instead of throwing
+    return NextResponse.json({
+      error: 'Failed to generate valid plan',
+      details: 'AI response was not in expected JSON format',
+      retry: true,
+      debugInfo: {
+        responseStart: content.text.substring(0, 200),
+        responseType: typeof content.text
+      }
+    }, { status: 500 })
+  }
+
+  // Validate the response structure
+  if (!validateVibePlanFile(planData)) {
+    console.error('Validation failed for parsed data:', planData)
+    return NextResponse.json({
+      error: 'Generated plan failed validation',
+      details: 'The AI response was parsed but has invalid structure',
+      retry: true
+    }, { status: 500 })
+  }
+
+  // Ensure all user IDs from teamMembersWithUUIDs are included
+  for (const member of teamMembersWithUUIDs) {
+    if (!planData.assignments[member.id]) {
+      planData.assignments[member.id] = {
+        user_name: member.name,
+        monday: [],
+        tuesday: [],
+        wednesday: [],
+        thursday: [],
+        friday: [],
+        saturday: [],
+        sunday: [],
+        anytime_this_week: [],
+        deck: []
+      }
+    }
+  }
+
+  // Validate that assignment keys are UUIDs
+  console.log('Assignment keys in response:', Object.keys(planData.assignments))
+  console.log('Number of users with assignments:', Object.keys(planData.assignments).length)
+  console.log('Tasks per person:', planData.statistics.tasks_per_person)
+  
+  // Log first few assignments for debugging
+  Object.entries(planData.assignments).slice(0, 2).forEach(([userId, userPlan]) => {
+    const taskCount = Object.values(userPlan).filter(v => Array.isArray(v))
+      .reduce((sum, tasks) => sum + tasks.length, 0)
+    console.log(`User ${userId} (${userPlan.user_name}): ${taskCount} tasks`)
+  })
+  
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const invalidKeys = Object.keys(planData.assignments).filter(key => !uuidRegex.test(key))
+  
+  if (invalidKeys.length > 0) {
+    console.warn('AI response contains non-UUID keys:', invalidKeys)
+    console.warn('This may cause plan_tasks creation to fail')
+  }
+
+  return NextResponse.json(planData)
 }

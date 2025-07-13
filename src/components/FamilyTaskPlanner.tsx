@@ -2,12 +2,13 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus } from "lucide-react"
+import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus, GripVertical } from "lucide-react"
 import { TaskForm, type TaskFormData } from "@/components/forms/TaskForm"
 import { ObjectiveForm, type ObjectiveFormData } from "@/components/forms/ObjectiveForm"
 import { MaintenanceForm, type MaintenanceFormData } from "@/components/forms/MaintenanceForm"
@@ -29,6 +30,7 @@ interface Task {
   status: string
   importance?: number
   urgency?: number
+  position?: number
   created_at: string
   updated_at: string
 }
@@ -39,6 +41,7 @@ interface TaskWithUser {
   status: string
   importance: number | null
   urgency: number | null
+  position: number | null
   created_at: string | null
   updated_at: string | null
   day_of_week: number | null  // Add this field to match the database schema
@@ -86,7 +89,6 @@ export default function FamilyTaskPlanner() {
     deck: true,
     completed: false,
   })
-  const [draggedTask, setDraggedTask] = useState<{ task: Task; fromSection: string } | null>(null)
   const [tagMap, setTagMap] = useState<Record<string, string>>({})
   const [isLoadingTags, setIsLoadingTags] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -155,6 +157,7 @@ export default function FamilyTaskPlanner() {
             )
           `)
           .eq('team_id', TEAM_ID)
+          .order('position', { ascending: true })
           .order('created_at', { ascending: false })
 
         if (tasksError) throw tasksError
@@ -169,6 +172,7 @@ export default function FamilyTaskPlanner() {
             status: task.status || 'pending',
             importance: task.importance ?? undefined,
             urgency: task.urgency ?? undefined,
+            position: task.position ?? 0,
             created_at: task.created_at || new Date().toISOString(),
             updated_at: task.updated_at || new Date().toISOString(),
           }
@@ -366,29 +370,143 @@ export default function FamilyTaskPlanner() {
     }
   }
 
-  const handleDragStart = (task: Task, fromSection: string) => {
-    setDraggedTask({ task, fromSection })
-  }
+  const handleDragEnd = async (result: DropResult) => {
+    const { source, destination, draggableId } = result
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e: React.DragEvent, toSection: string) => {
-    e.preventDefault()
-    if (!draggedTask || toSection === "completed") return
-
-    const { task, fromSection } = draggedTask
-
-    if (fromSection !== toSection) {
-      setTasks((prev) => ({
-        ...prev,
-        [fromSection]: prev[fromSection].filter((t) => t.id !== task.id),
-        [toSection]: [...prev[toSection], task],
-      }))
+    // Dropped outside a droppable area or in completed section
+    if (!destination || destination.droppableId === "completed") {
+      return
     }
 
-    setDraggedTask(null)
+    // Dropped in the same position
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
+      return
+    }
+
+    // Find the task being dragged
+    const taskId = draggableId
+    const sourceSection = source.droppableId
+    const destSection = destination.droppableId
+    
+    const sourceList = [...tasks[sourceSection]]
+    const task = sourceList.find(t => t.id === taskId)
+    
+    if (!task) return
+
+    // Remove task from source
+    sourceList.splice(source.index, 1)
+
+    if (sourceSection === destSection) {
+      // Reordering within the same section
+      sourceList.splice(destination.index, 0, task)
+      
+      setTasks(prev => ({
+        ...prev,
+        [sourceSection]: sourceList
+      }))
+
+      // Update positions for all tasks in this section
+      try {
+        const updates = sourceList.map((t, index) => ({
+          id: t.id,
+          position: index,
+          updated_at: new Date().toISOString()
+        }))
+
+        // Update all positions in batch
+        for (const update of updates) {
+          const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ 
+              position: update.position,
+              updated_at: update.updated_at
+            })
+            .eq('id', update.id)
+
+          if (updateError) throw updateError
+        }
+
+      } catch (err) {
+        console.error('Error updating task positions:', err)
+        setError(err instanceof Error ? err.message : 'Failed to update task positions')
+        // Revert the UI change
+        setRefreshTrigger(prev => prev + 1)
+      }
+    } else {
+      // Moving between sections
+      const destList = [...tasks[destSection]]
+      destList.splice(destination.index, 0, task)
+      
+      setTasks(prev => ({
+        ...prev,
+        [sourceSection]: sourceList,
+        [destSection]: destList
+      }))
+
+      // Update the task's day_of_week and positions
+      try {
+        const newDayOfWeek = dayMapping[destSection as keyof typeof dayMapping] ?? 7
+        
+        // Update the moved task's day_of_week and position
+        const { error: moveError } = await supabase
+          .from('tasks')
+          .update({ 
+            day_of_week: newDayOfWeek,
+            position: destination.index,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', taskId)
+
+        if (moveError) throw moveError
+
+        // Update positions for source section
+        const sourceUpdates = sourceList.map((t, index) => ({
+          id: t.id,
+          position: index
+        }))
+
+        for (const update of sourceUpdates) {
+          const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ 
+              position: update.position,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', update.id)
+
+          if (updateError) throw updateError
+        }
+
+        // Update positions for destination section (excluding the moved task)
+        const destUpdates = destList
+          .filter(t => t.id !== taskId)
+          .map((t, index) => ({
+            id: t.id,
+            position: index >= destination.index ? index + 1 : index
+          }))
+
+        for (const update of destUpdates) {
+          const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ 
+              position: update.position,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', update.id)
+
+          if (updateError) throw updateError
+        }
+
+      } catch (err) {
+        console.error('Error updating task section:', err)
+        setError(err instanceof Error ? err.message : 'Failed to update task')
+        // Revert the UI change
+        setRefreshTrigger(prev => prev + 1)
+      }
+    }
   }
 
   const handleTaskSubmit = async (data: TaskFormData) => {
@@ -559,6 +677,22 @@ export default function FamilyTaskPlanner() {
       // Get the day_of_week value from dayMapping
       const day_of_week = dayMapping[sectionKey as keyof typeof dayMapping] ?? 7
 
+      // Get the current max position for this section
+      const { data: maxPositionData, error: positionError } = await supabase
+        .from('tasks')
+        .select('position')
+        .eq('team_id', TEAM_ID)
+        .eq('day_of_week', day_of_week)
+        .eq('status', 'pending')
+        .order('position', { ascending: false })
+        .limit(1)
+
+      if (positionError) throw positionError
+
+      const nextPosition = maxPositionData && maxPositionData.length > 0 
+        ? (maxPositionData[0].position ?? 0) + 1 
+        : 0
+
       // Prepare task data
       const taskData = {
         team_id: TEAM_ID,
@@ -568,6 +702,7 @@ export default function FamilyTaskPlanner() {
         urgency: data.urgency,
         assignee_id: data.assignee_id || null,
         day_of_week,  // Use the mapped day value
+        position: nextPosition,
         objective_id: data.objectiveId === 'none' ? null : data.objectiveId,
         status: 'pending',
         created_at: new Date().toISOString(),
@@ -621,22 +756,31 @@ export default function FamilyTaskPlanner() {
     }
   }
 
-  const TaskItem = ({ task, sectionKey }: { task: Task; sectionKey: string }) => (
-    <div
-      className="flex items-center gap-3 py-2 hover:bg-blue-50 rounded cursor-move"
-      draggable
-      onDragStart={() => handleDragStart(task, sectionKey)}
-    >
-      <Checkbox
-        checked={task.completed}
-        onCheckedChange={() => toggleTaskComplete(task.id, sectionKey)}
-        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-      />
-      <span className={`flex-1 text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>
-        {task.title}
-        {selectedUser === "All Tasks" && <span className="text-blue-600 ml-2 font-medium">({task.assignee})</span>}
-      </span>
-    </div>
+  const TaskItem = ({ task, sectionKey, index }: { task: Task; sectionKey: string; index: number }) => (
+    <Draggable draggableId={task.id} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          className={`flex items-center gap-3 py-2 rounded ${
+            snapshot.isDragging ? 'bg-blue-100 shadow-lg' : 'hover:bg-blue-50'
+          }`}
+        >
+          <div {...provided.dragHandleProps} className="cursor-move">
+            <GripVertical className="w-4 h-4 text-gray-400" />
+          </div>
+          <Checkbox
+            checked={task.completed}
+            onCheckedChange={() => toggleTaskComplete(task.id, sectionKey)}
+            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+          />
+          <span className={`flex-1 text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>
+            {task.title}
+            {selectedUser === "All Tasks" && <span className="text-blue-600 ml-2 font-medium">({task.assignee})</span>}
+          </span>
+        </div>
+      )}
+    </Draggable>
   )
 
   const SectionHeader = ({ section, taskCount }: { section: (typeof sections)[0]; taskCount: number }) => (
@@ -703,58 +847,67 @@ export default function FamilyTaskPlanner() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-4 pb-24">
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <ScrollArea className="h-full">
+            <div className="p-4 pb-24">
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
 
-            {isLoadingTasks ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-gray-500">Loading tasks...</p>
-              </div>
-            ) : (
-              sections.map((section) => {
-                const filteredTasks = filterTasks(tasks[section.key])
-                // Only hide completed section when empty
-                if (section.key === "completed" && filteredTasks.length === 0 && selectedUser !== "All Tasks") {
-                  return null
-                }
+              {isLoadingTasks ? (
+                <div className="flex items-center justify-center h-32">
+                  <p className="text-gray-500">Loading tasks...</p>
+                </div>
+              ) : (
+                sections.map((section) => {
+                  const filteredTasks = filterTasks(tasks[section.key])
+                  // Only hide completed section when empty
+                  if (section.key === "completed" && filteredTasks.length === 0 && selectedUser !== "All Tasks") {
+                    return null
+                  }
 
-                return (
-                  <Collapsible
-                    key={section.key}
-                    open={openSections[section.key]}
-                    onOpenChange={() => toggleSection(section.key)}
-                    className="mb-4"
-                  >
-                    <div
-                      className="border-b border-gray-100 pb-2"
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, section.key)}
+                  return (
+                    <Collapsible
+                      key={section.key}
+                      open={openSections[section.key]}
+                      onOpenChange={() => toggleSection(section.key)}
+                      className="mb-4"
                     >
-                      <SectionHeader section={section} taskCount={filteredTasks.length} />
+                      <div className="border-b border-gray-100 pb-2">
+                        <SectionHeader section={section} taskCount={filteredTasks.length} />
 
-                      <CollapsibleContent className="mt-2">
-                        {filteredTasks.length > 0 ? (
-                          <div className="space-y-1 pl-2">
-                            {filteredTasks.map((task) => (
-                              <TaskItem key={task.id} task={task} sectionKey={section.key} />
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-400 italic py-2 pl-2">No tasks</p>
-                        )}
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                )
-              })
-            )}
-          </div>
-        </ScrollArea>
+                        <CollapsibleContent className="mt-2">
+                          <Droppable droppableId={section.key} isDropDisabled={section.key === "completed"}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className={`space-y-1 pl-2 min-h-[40px] ${
+                                  snapshot.isDraggingOver ? 'bg-blue-50 rounded' : ''
+                                }`}
+                              >
+                                {filteredTasks.length > 0 ? (
+                                  filteredTasks.map((task, index) => (
+                                    <TaskItem key={task.id} task={task} sectionKey={section.key} index={index} />
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-gray-400 italic py-2">No tasks</p>
+                                )}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  )
+                })
+              )}
+            </div>
+          </ScrollArea>
+        </DragDropContext>
       </main>
 
       {/* Fixed Bottom Navigation */}

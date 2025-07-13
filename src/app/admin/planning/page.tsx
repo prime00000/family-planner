@@ -17,7 +17,28 @@ const phases = [
   { id: PLANNING_PHASES.VIBE_PLAN, label: 'Plan Week' },
 ] as const
 
+import { AgentLoadingState } from './components/AgentLoadingState'
+
 function LoadingState() {
+  // Check if we're using the new planning system
+  const { useNewPlanningSystem } = usePlanningStore.getState()
+  
+  if (useNewPlanningSystem) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="px-2 sm:px-4 py-4 sm:py-6">
+          <div className="bg-white rounded-lg shadow">
+            <AgentLoadingState 
+              fallbackMessage="Loading planning system..." 
+              showProgress={true} 
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
+  // Original loading state for legacy system
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-2 sm:px-4 py-4 sm:py-6">
@@ -81,15 +102,26 @@ export default function AdminPlanningPage() {
                   Review last week and plan the upcoming week
                 </p>
               </div>
-              <Button
-                onClick={() => router.push('/')}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Home</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => router.push('/admin/settings/planning')}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </Button>
+                <Button
+                  onClick={() => router.push('/')}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Home</span>
+                </Button>
+              </div>
             </div>
           </div>
 

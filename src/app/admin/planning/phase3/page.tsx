@@ -9,8 +9,18 @@ import { PriorityPrompt } from './components/PriorityPrompt'
 import { PlanDisplay } from './components/PlanDisplay'
 import { LoadingState } from './components/LoadingState'
 import { DeployDialog } from './components/DeployDialog'
-import { generateInitialPlan, refinePlan, savePlan } from './lib/ai-service'
+import { generateInitialPlan, refinePlan, savePlan, startPlanningDialogue, approvePlanningApproach } from './lib/ai-service'
 import { supabase } from '@/lib/supabase'
+import { ApproachDialogue } from '../components/ApproachDialogue'
+import { SelectionReview } from '../components/SelectionReview'
+import { AssignmentReview } from '../components/AssignmentReview'
+import type { DialoguePhase } from '@/lib/planning/agents/types'
+import type { 
+  SelectionReviewData, 
+  AssignmentReviewData,
+  SelectionManualAdjustments,
+  AssignmentManualAdjustments 
+} from '@/lib/planning/agents/review-types'
 import type { VibePlanFile, ConversationExchange } from './types'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
@@ -29,10 +39,10 @@ export default function Phase3PlanningPage() {
   const [showEditWarning, setShowEditWarning] = useState(false)
   
   // Local state for Phase 3
-  const [, setPriorityGuidance] = useState('')
+  const [priorityGuidance, setPriorityGuidance] = useState('')
   const [skipPriority, setSkipPriority] = useState(false)
   const [currentPlan, setCurrentPlan] = useState<VibePlanFile | null>(null)
-  const [, setPlanVersion] = useState(0)
+  const [planVersion, setPlanVersion] = useState(0)
   const [isGenerating, setIsGenerating] = useState(false)
   const [conversation, setConversation] = useState<ConversationExchange[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -41,12 +51,38 @@ export default function Phase3PlanningPage() {
   const [planTitle, setPlanTitle] = useState('')
   const [scheduledDate, setScheduledDate] = useState<string | null>(null)
   
+  // New state for dialogue flow
+  const [dialoguePhase, setDialoguePhase] = useState<DialoguePhase | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [planningData, setPlanningData] = useState<any>(null)
+  
+  // Review state
+  const [showSelectionReview, setShowSelectionReview] = useState(false)
+  const [selectionReviewData, setSelectionReviewData] = useState<SelectionReviewData | null>(null)
+  const [showAssignmentReview, setShowAssignmentReview] = useState(false)
+  const [assignmentReviewData, setAssignmentReviewData] = useState<AssignmentReviewData | null>(null)
+  
   // Redirect if not admin
   useEffect(() => {
     if (!authLoading && !isAdmin) {
       router.replace('/')
     }
   }, [authLoading, isAdmin, router])
+  
+  // Set the new planning system flag in the store and pass skip preferences
+  useEffect(() => {
+    const { setUseNewPlanningSystem, skipPreferences } = usePlanningStore.getState()
+    const useNewSystem = process.env.NEXT_PUBLIC_USE_NEW_PLANNING_SYSTEM === 'true'
+    setUseNewPlanningSystem(useNewSystem)
+    
+    // Pass skip preferences to orchestrator
+    if (useNewSystem) {
+      import('@/lib/planning/agents/agent-orchestrator').then(({ AgentOrchestrator }) => {
+        const orchestrator = AgentOrchestrator.getInstance()
+        orchestrator.setSkipPreferences(skipPreferences)
+      })
+    }
+  }, [])
 
   // Redirect if not in vibe plan phase
   useEffect(() => {
@@ -98,6 +134,17 @@ export default function Phase3PlanningPage() {
     setIsGenerating(true)
     setPriorityGuidance(guidance || '')
     setSkipPriority(true)
+    
+    // Update agent progress if using new system
+    const { updateAgentProgress, useNewPlanningSystem } = usePlanningStore.getState()
+    if (useNewPlanningSystem) {
+      updateAgentProgress({
+        currentAgent: 'organizing',
+        currentPhase: 'dialogue',
+        message: 'Analyzing your planning request...',
+        percentage: 10
+      })
+    }
     
     try {
       // Fetch incomplete tasks
@@ -151,7 +198,8 @@ export default function Phase3PlanningPage() {
         email: member.users.email
       }))
 
-      const plan = await generateInitialPlan({
+      // Store planning data for later use
+      const data = {
         priorityGuidance: guidance || undefined,
         incompleteTasks: (incompleteTasks || []).map(t => ({
           id: t.id,
@@ -178,21 +226,56 @@ export default function Phase3PlanningPage() {
           }))
         },
         teamMembers: transformedMembers
-      })
-      
-      setCurrentPlan(plan)
-      setPlanVersion(1)
-      // Set the AI's suggested title
-      if (plan.title) {
-        setPlanTitle(plan.title)
       }
+      setPlanningData(data)
       
-      // Show success toast
-      toast({
-        title: "Plan generated successfully",
-        description: "Your weekly plan has been created.",
-        duration: 3000,
-      })
+      // Check if new planning system is enabled
+      const useNewSystem = process.env.NEXT_PUBLIC_USE_NEW_PLANNING_SYSTEM === 'true'
+      
+      if (useNewSystem) {
+        // Use new dialogue flow
+        console.log('Using new planning system - starting dialogue')
+        
+        // Update progress while waiting for dialogue
+        updateAgentProgress({
+          currentAgent: 'organizing',
+          currentPhase: 'dialogue',
+          message: 'Organizing Agent is analyzing your requirements and context...',
+          percentage: 30
+        })
+        
+        const result = await startPlanningDialogue(data)
+        console.log('Dialogue result:', result)
+        
+        // Update progress to complete
+        updateAgentProgress({
+          currentAgent: 'organizing',
+          currentPhase: 'dialogue',
+          message: 'Approach proposal ready for review',
+          percentage: 100
+        })
+        
+        setDialoguePhase(result.dialoguePhase)
+        setSessionId(result.sessionId)
+        setIsGenerating(false) // Stop loading once dialogue is received
+        // Don't show success toast here - wait for actual plan generation
+      } else {
+        // Use legacy system
+        const plan = await generateInitialPlan(data)
+        setCurrentPlan(plan)
+        setPlanVersion(1)
+        // Set the AI's suggested title
+        if (plan.title) {
+          setPlanTitle(plan.title)
+        }
+        
+        // Show success toast only for legacy system
+        toast({
+          title: "Plan generated successfully",
+          description: "Your weekly plan has been created.",
+          duration: 3000,
+        })
+      }
     } catch (error) {
       console.error('Error generating plan:', error)
       toast({
@@ -201,7 +284,6 @@ export default function Phase3PlanningPage() {
         variant: "destructive",
         duration: 5000,
       })
-    } finally {
       setIsGenerating(false)
     }
   }
@@ -210,6 +292,17 @@ export default function Phase3PlanningPage() {
     if (!currentPlan || isProcessing) return
     
     setIsProcessing(true)
+    
+    // Update agent progress if using new system
+    const { updateAgentProgress, useNewPlanningSystem } = usePlanningStore.getState()
+    if (useNewPlanningSystem) {
+      updateAgentProgress({
+        currentAgent: 'organizing',
+        currentPhase: 'refinement',
+        message: 'Processing your feedback...',
+        percentage: 20
+      })
+    }
     
     try {
       const result = await refinePlan({
@@ -263,6 +356,349 @@ export default function Phase3PlanningPage() {
     setPriorityGuidance('')
     setConversation([])
     setSelectedTaskIds(new Set())
+    setDialoguePhase(null)
+    setSessionId(null)
+    setPlanningData(null)
+    setShowSelectionReview(false)
+    setSelectionReviewData(null)
+    setShowAssignmentReview(false)
+    setAssignmentReviewData(null)
+  }
+  
+  const handleSelectionReviewApprove = async (adjustments?: SelectionManualAdjustments) => {
+    if (!sessionId || !selectionReviewData) return
+    
+    setIsProcessing(true)
+    const { updateAgentProgress } = usePlanningStore.getState()
+    
+    try {
+      // Send review adjustments to backend
+      const response = await fetch('/api/planning/v2/review/selection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          reviewData: selectionReviewData,
+          adjustments
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to process selection review')
+      }
+      
+      // Hide review and continue with plan generation
+      setShowSelectionReview(false)
+      setSelectionReviewData(null)
+      
+      // Continue plan generation
+      updateAgentProgress({
+        currentAgent: 'organizing',
+        currentPhase: 'assignment',
+        message: 'Assigning tasks to team members...',
+        percentage: 80
+      })
+      
+      // Call approve again to continue
+      await handleApproveApproach(true)
+      
+    } catch (error) {
+      console.error('Error processing selection review:', error)
+      toast({
+        title: "Review processing failed",
+        description: error instanceof Error ? error.message : "Failed to process review",
+        variant: "destructive",
+        duration: 5000,
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+  
+  const handleSelectionReviewSkip = (reason: string) => {
+    console.log('Skipping selection review:', reason)
+    setShowSelectionReview(false)
+    setSelectionReviewData(null)
+    
+    // Continue with plan generation
+    const { updateAgentProgress } = usePlanningStore.getState()
+    updateAgentProgress({
+      currentAgent: 'organizing',
+      currentPhase: 'assignment',
+      message: 'Assigning tasks to team members...',
+      percentage: 80
+    })
+    
+    // Call approve again to continue
+    handleApproveApproach(true)
+  }
+  
+  const handleAssignmentReviewApprove = async (adjustments?: AssignmentManualAdjustments) => {
+    if (!sessionId || !assignmentReviewData) return
+    
+    setIsProcessing(true)
+    const { updateAgentProgress } = usePlanningStore.getState()
+    
+    try {
+      // Send review adjustments to backend
+      const response = await fetch('/api/planning/v2/review/assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          reviewData: assignmentReviewData,
+          adjustments
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to process assignment review')
+      }
+      
+      // Hide review and continue with plan generation
+      setShowAssignmentReview(false)
+      setAssignmentReviewData(null)
+      
+      // Continue plan generation
+      updateAgentProgress({
+        currentAgent: 'editing',
+        currentPhase: 'finalizing',
+        message: 'Generating final plan...',
+        percentage: 95
+      })
+      
+      // Call approve again to continue
+      await handleApproveApproach(true)
+      
+    } catch (error) {
+      console.error('Error processing assignment review:', error)
+      toast({
+        title: "Review processing failed",
+        description: error instanceof Error ? error.message : "Failed to process review",
+        variant: "destructive",
+        duration: 5000,
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+  
+  const handleAssignmentReviewSkip = (reason: string) => {
+    console.log('Skipping assignment review:', reason)
+    setShowAssignmentReview(false)
+    setAssignmentReviewData(null)
+    
+    // Continue with plan generation
+    const { updateAgentProgress } = usePlanningStore.getState()
+    updateAgentProgress({
+      currentAgent: 'editing',
+      currentPhase: 'finalizing',
+      message: 'Generating final plan...',
+      percentage: 95
+    })
+    
+    // Call approve again to continue
+    handleApproveApproach(true)
+  }
+  
+  const handleApproveApproach = async (approved: boolean, adjustments?: string) => {
+    if (!sessionId || !planningData) return
+    
+    setIsGenerating(true)
+    
+    // Update agent progress
+    const { updateAgentProgress } = usePlanningStore.getState()
+    
+    // If adjustments are provided, we need to get a revised approach first
+    if (adjustments) {
+      updateAgentProgress({
+        currentAgent: 'organizing',
+        currentPhase: 'dialogue',
+        message: 'Revising approach based on your feedback...',
+        percentage: 20
+      })
+      
+      try {
+        // Call dialogue endpoint again with adjustments and previous approach as context
+        const previousApproach = dialoguePhase ? {
+          summary: dialoguePhase.proposedApproach.summary,
+          priorities: dialoguePhase.proposedApproach.priorities,
+          strategy: dialoguePhase.proposedApproach.strategy,
+          identifiedTasks: dialoguePhase.identifiedTasks
+        } : null
+        
+        const contextualizedInstructions = `${planningData.priorityGuidance || 'Create a balanced weekly plan for the family'}
+
+PREVIOUS APPROACH:
+${previousApproach ? `
+Summary: ${previousApproach.summary}
+Priorities: ${previousApproach.priorities.join(', ')}
+Strategy: ${previousApproach.strategy}
+Identified ${previousApproach.identifiedTasks.newItems.length} new tasks and ${previousApproach.identifiedTasks.modificationsNeeded.length} modifications.
+` : 'No previous approach available'}
+
+ADJUSTMENTS REQUESTED:
+${adjustments}
+
+Please revise the approach based on the above feedback while maintaining the good aspects of the previous approach.`
+        
+        const revisedData = {
+          ...planningData,
+          priorityGuidance: contextualizedInstructions
+        }
+        
+        const result = await startPlanningDialogue(revisedData)
+        
+        updateAgentProgress({
+          currentAgent: 'organizing',
+          currentPhase: 'dialogue',
+          message: 'Revised approach ready for review',
+          percentage: 100
+        })
+        
+        // Update the dialogue phase with revised approach
+        setDialoguePhase(result.dialoguePhase)
+        setSessionId(result.sessionId)
+        setIsGenerating(false)
+        
+        // Don't continue to plan generation - wait for approval of revised approach
+        return
+      } catch (error) {
+        console.error('Error revising approach:', error)
+        toast({
+          title: "Failed to revise approach",
+          description: error instanceof Error ? error.message : "Failed to process adjustments",
+          variant: "destructive",
+          duration: 5000,
+        })
+        setIsGenerating(false)
+        return
+      }
+    }
+    
+    // If no adjustments (direct approval), proceed with plan generation
+    updateAgentProgress({
+      currentAgent: 'organizing',
+      currentPhase: 'execution',
+      message: 'Creating detailed planning guides...',
+      percentage: 10
+    })
+    
+    try {
+      // Simulate progress updates (in production, these would come from the backend)
+      const timer1 = setTimeout(() => {
+        updateAgentProgress({
+          currentAgent: 'editing',
+          currentPhase: 'task-creation',
+          message: 'Editing Agent is creating and formatting tasks...',
+          percentage: 30
+        })
+      }, 3000)
+      
+      const timer2 = setTimeout(() => {
+        updateAgentProgress({
+          currentAgent: 'selection',
+          currentPhase: 'optimization',
+          message: 'Selection Agent is optimizing task distribution...',
+          percentage: 60
+        })
+      }, 8000)
+      
+      const timer3 = setTimeout(() => {
+        updateAgentProgress({
+          currentAgent: 'organizing',
+          currentPhase: 'assignment',
+          message: 'Finalizing task assignments...',
+          percentage: 85
+        })
+      }, 12000)
+      
+      const result = await approvePlanningApproach({
+        sessionId,
+        approved,
+        adjustments,
+        ...planningData
+      })
+      
+      // Clear timers
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      
+      // Check if we need to show a review
+      if ('needsSelectionReview' in result && result.needsSelectionReview) {
+        console.log('Need selection review', result)
+        setSelectionReviewData(result.selectionReviewData)
+        setShowSelectionReview(true)
+        setIsGenerating(false)
+        
+        // Update progress to show we're in review
+        updateAgentProgress({
+          currentAgent: 'selection',
+          currentPhase: 'review',
+          message: 'Review and adjust task selections',
+          percentage: 70
+        })
+        return
+      }
+      
+      if ('needsAssignmentReview' in result && result.needsAssignmentReview) {
+        console.log('Need assignment review', result)
+        setAssignmentReviewData(result.assignmentReviewData)
+        setShowAssignmentReview(true)
+        setIsGenerating(false)
+        
+        // Update progress to show we're in review
+        updateAgentProgress({
+          currentAgent: 'organizing',
+          currentPhase: 'review',
+          message: 'Review and adjust task assignments',
+          percentage: 90
+        })
+        return
+      }
+      
+      // If we get here, we have a final plan
+      const plan = result as VibePlanFile
+      
+      // Final progress update
+      updateAgentProgress({
+        currentAgent: 'organizing',
+        currentPhase: 'complete',
+        message: 'Plan generation complete!',
+        percentage: 100
+      })
+      
+      setCurrentPlan(plan)
+      setPlanVersion(1)
+      setDialoguePhase(null)
+      // Set the AI's suggested title
+      if (plan.title) {
+        setPlanTitle(plan.title)
+      }
+      
+      // Clear progress after a moment
+      setTimeout(() => {
+        updateAgentProgress({})
+      }, 1000)
+      
+      // Show success toast
+      toast({
+        title: "Plan generated successfully",
+        description: "Your weekly plan has been created.",
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error('Error approving plan:', error)
+      toast({
+        title: "Plan generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate plan",
+        variant: "destructive",
+        duration: 5000,
+      })
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   // Show loading state while checking auth
@@ -320,10 +756,63 @@ export default function Phase3PlanningPage() {
     )
   }
 
-  // Show loading while generating
+  // Show loading while generating (show this before dialogue to handle adjustments)
   if (isGenerating) {
+    console.log('Still generating, showing loading state')
     return <LoadingState message="AI is creating your weekly plan..." />
   }
+  
+  // Show dialogue phase if active (after loading check)
+  if (dialoguePhase && !currentPlan) {
+    console.log('Showing ApproachDialogue with dialoguePhase:', dialoguePhase)
+    return (
+      <ApproachDialogue
+        dialoguePhase={dialoguePhase}
+        onApprove={(adjustments) => handleApproveApproach(true, adjustments)}
+        onReject={() => handleStartOver()}
+        isProcessing={false}  // Don't show processing in the button since we'll show full loading state
+      />
+    )
+  }
+  
+  // Show selection review if active
+  if (showSelectionReview && selectionReviewData) {
+    console.log('Showing SelectionReview')
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <SelectionReview
+          reviewData={selectionReviewData}
+          onApprove={handleSelectionReviewApprove}
+          onSkip={handleSelectionReviewSkip}
+          isProcessing={isProcessing}
+          autoContinueEnabled={false}
+        />
+      </div>
+    )
+  }
+  
+  // Show assignment review if active
+  if (showAssignmentReview && assignmentReviewData) {
+    console.log('Showing AssignmentReview')
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <AssignmentReview
+          reviewData={assignmentReviewData}
+          onApprove={handleAssignmentReviewApprove}
+          onSkip={handleAssignmentReviewSkip}
+          isProcessing={isProcessing}
+          autoContinueEnabled={false}
+        />
+      </div>
+    )
+  }
+  
+  console.log('Current state:', {
+    dialoguePhase,
+    currentPlan,
+    isGenerating,
+    skipPriority
+  })
 
   // Show plan display
   if (currentPlan) {
