@@ -13,6 +13,8 @@ interface TaskFormProps {
   onSubmit: (data: TaskFormData, andContinue?: boolean) => void
   defaultAssignee?: string
   isManualTask?: boolean
+  editMode?: boolean
+  initialData?: Partial<TaskFormData>
 }
 
 export interface TaskFormData {
@@ -34,7 +36,8 @@ interface Objective {
   description: string
 }
 
-const TAGS = [
+// Default tags if database tags fail to load
+const DEFAULT_TAGS = [
   { id: 'health', label: 'Health' },
   { id: 'shopping', label: 'Shopping' },
   { id: 'education', label: 'Education' },
@@ -42,19 +45,24 @@ const TAGS = [
   { id: 'other', label: 'Other' },
 ]
 
-export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: TaskFormProps) {
+export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask, editMode, initialData }: TaskFormProps) {
   const { user } = useAuth()
   const [formData, setFormData] = useState<TaskFormData>({
-    description: '',
-    tags: [],
-    assignee_id: defaultAssignee || '',
+    description: initialData?.description || '',
+    importance: initialData?.importance,
+    urgency: initialData?.urgency,
+    tags: initialData?.tags || [],
+    objectiveId: initialData?.objectiveId,
+    assignee_id: initialData?.assignee_id || defaultAssignee || '',
   })
+  const [originalFormData, setOriginalFormData] = useState<TaskFormData | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
   const [showMoreOptions, setShowMoreOptions] = useState(false)
+  const [availableTags, setAvailableTags] = useState(DEFAULT_TAGS)
 
   useEffect(() => {
     // Fetch family members
@@ -97,8 +105,34 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
       }
     }
 
+    // Fetch tags
+    async function fetchTags() {
+      try {
+        const { data: tags, error } = await supabase
+          .from('tags')
+          .select('id, name')
+          .eq('team_id', TEAM_ID)
+          .order('name')
+
+        if (error) throw error
+
+        if (tags && tags.length > 0) {
+          // Map database tags to the format expected by the form
+          const formattedTags = tags.map(tag => ({
+            id: tag.name.toLowerCase().replace(/\s+/g, ''),
+            label: tag.name
+          }))
+          setAvailableTags(formattedTags)
+        }
+      } catch (err) {
+        console.error('Error fetching tags:', err)
+        // Keep using default tags if fetch fails
+      }
+    }
+
     fetchFamilyMembers()
     fetchObjectives()
+    fetchTags()
   }, [])
 
   useEffect(() => {
@@ -106,6 +140,17 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
     requestAnimationFrame(() => {
       setIsOpen(true)
     })
+    // Store original form data for change detection
+    if (editMode && initialData) {
+      setOriginalFormData({
+        description: initialData.description || '',
+        importance: initialData.importance,
+        urgency: initialData.urgency,
+        tags: initialData.tags || [],
+        objectiveId: initialData.objectiveId,
+        assignee_id: initialData.assignee_id || '',
+      })
+    }
   }, [])
 
   useEffect(() => {
@@ -118,7 +163,26 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
     }
   }, [user, familyMembers, defaultAssignee, formData.assignee_id])
 
+  const hasChanges = () => {
+    if (!editMode || !originalFormData) return false
+    
+    return (
+      formData.description !== originalFormData.description ||
+      formData.importance !== originalFormData.importance ||
+      formData.urgency !== originalFormData.urgency ||
+      formData.assignee_id !== originalFormData.assignee_id ||
+      formData.objectiveId !== originalFormData.objectiveId ||
+      JSON.stringify(formData.tags.sort()) !== JSON.stringify(originalFormData.tags.sort())
+    )
+  }
+
   const handleClose = () => {
+    if (editMode && hasChanges()) {
+      // Auto-save changes when closing in edit mode
+      handleSubmit(false, false)
+      return
+    }
+    
     setIsOpen(false)
     // Wait for animation to complete before actually closing
     setTimeout(onClose, 500)
@@ -212,12 +276,38 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
           {/* Success Message Overlay */}
           {showSuccess && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center animate-fade-in z-[60]">
-              <p className="text-green-600 text-lg font-medium">Task added successfully!</p>
+              <p className="text-green-600 text-lg font-medium">
+                {editMode ? 'Task updated successfully!' : 'Task added successfully!'}
+              </p>
             </div>
           )}
 
-          <div className="flex justify-end mb-6">
-            <Button variant="ghost" size="sm" onClick={handleClose}>×</Button>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {editMode ? 'Edit Task' : isManualTask ? 'Add New Task' : 'Create Task'}
+            </h2>
+            <div className="flex items-center gap-2">
+              {editMode && (
+                <Button 
+                  size="sm" 
+                  className="text-xs px-3 py-1 h-auto bg-red-600 hover:bg-red-700 text-white" 
+                  onClick={() => {
+                    setIsOpen(false)
+                    setTimeout(onClose, 500)
+                  }}
+                >
+                  Discard Changes
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-2xl" 
+                onClick={handleClose}
+              >
+                ×
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -282,24 +372,26 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
               // Manual task mode - show collapsible more options
               <div>
                 {/* Quick Submit buttons for manual tasks - primary action */}
-                <div className="flex gap-2 mb-4">
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="flex-1"
-                    onClick={() => handleSubmit(true, false)}
-                  >
-                    Quick Submit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="flex-1"
-                    onClick={() => handleSubmit(true, true)}
-                  >
-                    Quick Submit +
-                  </Button>
-                </div>
+                {!editMode && (
+                  <div className="flex gap-2 mb-4">
+                    <Button
+                      variant="default"
+                      size="lg"
+                      className="flex-1"
+                      onClick={() => handleSubmit(true, false)}
+                    >
+                      Quick Submit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="flex-1"
+                      onClick={() => handleSubmit(true, true)}
+                    >
+                      Quick Submit +
+                    </Button>
+                  </div>
+                )}
 
                 <Button
                   variant="ghost"
@@ -346,7 +438,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                         Tags
                       </label>
                       <div className="grid grid-cols-2 gap-3">
-                        {TAGS.map(tag => (
+                        {availableTags.map(tag => (
                           <div key={tag.id} className="flex items-center h-12">
                             <label
                               htmlFor={tag.id}
@@ -397,21 +489,23 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                     </div>
 
                     {/* Regular Submit buttons moved inside More options */}
-                    <div className="flex gap-3 pt-6 mt-8 border-t">
-                      <Button
-                        className="flex-1 h-12 text-base"
-                        onClick={() => handleSubmit(false, false)}
-                      >
-                        Submit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 h-12 text-base"
-                        onClick={() => handleSubmit(false, true)}
-                      >
-                        Submit +
-                      </Button>
-                    </div>
+                    {!editMode && (
+                      <div className="flex gap-3 pt-6 mt-8 border-t">
+                        <Button
+                          className="flex-1 h-12 text-base"
+                          onClick={() => handleSubmit(false, false)}
+                        >
+                          Submit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 h-12 text-base"
+                          onClick={() => handleSubmit(false, true)}
+                        >
+                          Submit +
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -423,7 +517,7 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                     Tags
                   </label>
                   <div className="grid grid-cols-2 gap-3">
-                    {TAGS.map(tag => (
+                    {availableTags.map(tag => (
                       <div key={tag.id} className="flex items-center h-12">
                         <label
                           htmlFor={tag.id}
@@ -500,21 +594,23 @@ export function TaskForm({ onClose, onSubmit, defaultAssignee, isManualTask }: T
                 </div>
 
                 {/* Regular Submit buttons for non-manual tasks */}
-                <div className="flex gap-3 pt-6 mt-8 border-t">
-                  <Button
-                    className="flex-1 h-12 text-base"
-                    onClick={() => handleSubmit(false, false)}
-                  >
-                    Submit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-12 text-base"
-                    onClick={() => handleSubmit(false, true)}
-                  >
-                    Submit +
-                  </Button>
-                </div>
+                {!editMode && (
+                  <div className="flex gap-3 pt-6 mt-8 border-t">
+                    <Button
+                      className="flex-1 h-12 text-base"
+                      onClick={() => handleSubmit(false, false)}
+                    >
+                      Submit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-12 text-base"
+                      onClick={() => handleSubmit(false, true)}
+                    >
+                      Submit +
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>

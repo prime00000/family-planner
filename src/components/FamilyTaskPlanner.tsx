@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus, GripVertical } from "lucide-react"
+import { Home, Lightbulb, ListTodo, Wrench, CalendarIcon, Plus, GripVertical, Settings } from "lucide-react"
 import { TaskForm, type TaskFormData } from "@/components/forms/TaskForm"
 import { ObjectiveForm, type ObjectiveFormData } from "@/components/forms/ObjectiveForm"
 import { MaintenanceForm, type MaintenanceFormData } from "@/components/forms/MaintenanceForm"
@@ -26,11 +26,14 @@ interface Task {
   id: string
   title: string
   assignee: string
+  assignee_id?: string
   completed: boolean
   status: string
   importance?: number
   urgency?: number
   position?: number
+  objective_id?: string
+  tags?: string[]
   created_at: string
   updated_at: string
 }
@@ -42,6 +45,8 @@ interface TaskWithUser {
   importance: number | null
   urgency: number | null
   position: number | null
+  assignee_id: string | null
+  objective_id: string | null
   created_at: string | null
   updated_at: string | null
   day_of_week: number | null  // Add this field to match the database schema
@@ -59,7 +64,7 @@ const TEAM_ID = 'ada25a92-25fa-4ca2-8d35-eb9b71f97e4b'
 const USER_ID = 'a0000000-0000-0000-0000-000000000001'
 
 export default function FamilyTaskPlanner() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [selectedUser, setSelectedUser] = useState("")
   const [activeTab, setActiveTab] = useState("home")
   const [manualAddDay, setManualAddDay] = useState<string | null>(null)
@@ -97,6 +102,10 @@ export default function FamilyTaskPlanner() {
     task: Task;
     fromSection: string;
     toSection: string;
+  } | null>(null)
+  const [editingTask, setEditingTask] = useState<{
+    task: Task;
+    sectionKey: string;
   } | null>(null)
 
   const users = ["All Tasks", "Kurt", "Jessica", "Barb", "Benjamin", "Eliana", "Elikai", "Konrad", "Avi Grace"]
@@ -168,11 +177,13 @@ export default function FamilyTaskPlanner() {
             id: task.id,
             title: task.description,
             assignee: task.users?.full_name || 'Unassigned',
+            assignee_id: task.assignee_id,
             completed: task.status === 'completed',
             status: task.status || 'pending',
             importance: task.importance ?? undefined,
             urgency: task.urgency ?? undefined,
             position: task.position ?? 0,
+            objective_id: task.objective_id,
             created_at: task.created_at || new Date().toISOString(),
             updated_at: task.updated_at || new Date().toISOString(),
           }
@@ -263,6 +274,51 @@ export default function FamilyTaskPlanner() {
   const filterTasks = (sectionTasks: Task[]) => {
     if (selectedUser === "All Tasks") return sectionTasks
     return sectionTasks.filter((task) => task.assignee === selectedUser)
+  }
+
+  const fetchTaskDetails = async (taskId: string) => {
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          users!assignee_id (
+            id,
+            full_name
+          ),
+          task_tags (
+            tags (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('id', taskId)
+        .single()
+
+      if (taskError) throw taskError
+
+      // Transform tags to match TaskFormData structure
+      const tagNames = (taskData.task_tags || []).map((tt: any) => {
+        // Convert tag names to tag IDs used by the form
+        const tagName = tt.tags.name.toLowerCase().replace(/\s+/g, '')
+        return tagName
+      })
+
+
+      return {
+        description: taskData.description,
+        importance: taskData.importance,
+        urgency: taskData.urgency,
+        assignee_id: taskData.assignee_id || '',
+        objectiveId: taskData.objective_id || 'none',
+        tags: tagNames
+      }
+    } catch (err) {
+      console.error('Error fetching task details:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load task details')
+      return null
+    }
   }
 
   const toggleSection = (sectionKey: string) => {
@@ -665,6 +721,81 @@ export default function FamilyTaskPlanner() {
     }
   }
 
+  const handleTaskUpdate = async (data: TaskFormData) => {
+    if (!editingTask) return
+
+    try {
+      setError(null)
+
+      const { task, sectionKey } = editingTask
+
+      // Update the task
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({
+          description: data.description,
+          importance: data.importance,
+          urgency: data.urgency,
+          assignee_id: data.assignee_id || null,
+          objective_id: data.objectiveId === 'none' ? null : data.objectiveId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', task.id)
+
+      if (updateError) throw updateError
+
+      // Delete existing tags
+      const { error: deleteTagsError } = await supabase
+        .from('task_tags')
+        .delete()
+        .eq('task_id', task.id)
+
+      if (deleteTagsError) throw deleteTagsError
+
+      // Insert new tags
+      if (data.tags.length > 0) {
+        const databaseTagIds = data.tags
+          .map(tagName => tagMap[tagName])
+          .filter(Boolean)
+
+        if (databaseTagIds.length > 0) {
+          const tagInserts = databaseTagIds.map(tagId => ({
+            task_id: task.id,
+            tag_id: tagId,
+          }))
+
+          const { error: tagError } = await supabase
+            .from('task_tags')
+            .insert(tagInserts)
+
+          if (tagError) {
+            console.error('Error saving tags:', tagError)
+          }
+        }
+      }
+
+      // Trigger a refresh of all tasks
+      setRefreshTrigger(prev => prev + 1)
+
+      // Close the edit form
+      setEditingTask(null)
+
+      // Reset error state on success
+      setError(null)
+
+    } catch (err) {
+      console.error('Error updating task:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        code: (err as SupabaseError)?.code,
+        details: (err as SupabaseError)?.details,
+        hint: (err as SupabaseError)?.hint,
+        fullError: err
+      })
+      setError(err instanceof Error ? err.message : 'Failed to update task')
+      throw err
+    }
+  }
+
   const handleManualTaskSubmit = async (data: TaskFormData, sectionKey: string) => {
     try {
       setError(null)
@@ -773,11 +904,27 @@ export default function FamilyTaskPlanner() {
             checked={task.completed}
             onCheckedChange={() => toggleTaskComplete(task.id, sectionKey)}
             className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+            onClick={(e) => e.stopPropagation()}
           />
-          <span className={`flex-1 text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>
+          <div 
+            className={`flex-1 text-sm cursor-pointer ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}
+            onClick={async () => {
+              const taskDetails = await fetchTaskDetails(task.id)
+              if (taskDetails) {
+                setEditingTask({ 
+                  task: {
+                    ...task,
+                    ...taskDetails,
+                    assignee_id: taskDetails.assignee_id
+                  }, 
+                  sectionKey 
+                })
+              }
+            }}
+          >
             {task.title}
             {selectedUser === "All Tasks" && <span className="text-blue-600 ml-2 font-medium">({task.assignee})</span>}
-          </span>
+          </div>
         </div>
       )}
     </Draggable>
@@ -813,18 +960,30 @@ export default function FamilyTaskPlanner() {
       <header className="bg-blue-600 text-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">Family Weekly Planner</h1>
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="w-32 bg-blue-700 border-blue-500 text-white text-sm">
-              <SelectValue>{selectedUser}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {users.map((user) => (
-                <SelectItem key={user} value={user}>
-                  {user}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-blue-700 p-2"
+                onClick={() => window.location.href = '/settings'}
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+            )}
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger className="w-32 bg-blue-700 border-blue-500 text-white text-sm">
+                <SelectValue>{selectedUser}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user} value={user}>
+                    {user}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </header>
 
@@ -918,9 +1077,9 @@ export default function FamilyTaskPlanner() {
             { icon: Lightbulb, key: "objectives", label: "Objectives" },
             { icon: ListTodo, key: "tasks", label: "Tasks" },
             { icon: Wrench, key: "maintenance", label: "Maintenance" },
-            { icon: CalendarIcon, key: "plan", label: "Plan", isAdmin: true },
-          ].map(({ icon: Icon, key, label, isAdmin }) => (
-            isAdmin ? (
+            { icon: CalendarIcon, key: "plan", label: "Plan", requiresAdmin: true },
+          ].map(({ icon: Icon, key, label, requiresAdmin }) => (
+            requiresAdmin ? (
               isAdmin && (
                 <Button
                   key={key}
@@ -931,7 +1090,7 @@ export default function FamilyTaskPlanner() {
                       ? key === "plan" 
                         ? "text-purple-600 bg-purple-50" 
                         : "text-blue-600 bg-blue-50"
-                      : isAdmin 
+                      : requiresAdmin 
                         ? "text-purple-600" 
                         : "text-gray-600"
                   }`}
@@ -998,6 +1157,17 @@ export default function FamilyTaskPlanner() {
         <MaintenanceForm
           onClose={() => setActiveTab("home")}
           onSubmit={handleMaintenanceSubmit}
+        />
+      )}
+
+      {/* Edit Task Form */}
+      {editingTask && (
+        <TaskForm
+          onClose={() => setEditingTask(null)}
+          onSubmit={handleTaskUpdate}
+          editMode={true}
+          initialData={editingTask.task}
+          isManualTask={false}
         />
       )}
     </div>
