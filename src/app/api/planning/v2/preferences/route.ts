@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { TEAM_ID } from '@/lib/constants'
 import type { SkipPreferences } from '@/lib/planning/agents/review-types'
+import type { Database } from '@/types/supabase'
+
+const supabase = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // TODO: Implement proper auth when frontend passes user context
+    // For now, using a default user ID to match other endpoints
+    const userId = 'default-user'
 
     // Try to fetch existing preferences from database
     const { data: preferences, error } = await supabase
@@ -74,10 +78,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // TODO: Implement proper auth when frontend passes user context
+    // For now, using a default user ID to match other endpoints
+    const userId = 'default-user'
 
     const body = await request.json()
     const { preferences } = body as { preferences: SkipPreferences }
